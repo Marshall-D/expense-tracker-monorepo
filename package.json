@@ -1,0 +1,15 @@
+{
+  "name": "expense-tracker-monorepo",
+  "private": true,
+  "devDependencies": {
+    "concurrently": "^8.0.0"
+  },
+  "scripts": {
+    "build": "pnpm -w -r run build",
+    "dev": "concurrently \"pnpm --filter server start:offline\" \"pnpm --filter client dev\"",
+    "typecheck": "pnpm -w -r run typecheck",
+    "lint": "pnpm -w -r run lint",
+    "deploy:server": "pnpm --filter server run deploy",
+    "deploy:client:s3": "pnpm --filter client run deploy:s3"
+  }
+}

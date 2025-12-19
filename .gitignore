@@ -1,0 +1,24 @@
+
+# Node & pnpm
+node_modules/
+.pnp/
+.pnpm-store/
+pnpm-lock.yaml
+
+# Build artifacts
+dist/
+build/
+packages/**/dist/
+
+# Serverless & local dev
+.serverless/
+.serverless_plugins/
+.vscode/
+.env
+packages/**/.env
+.DS_Store
+
+# logs
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*

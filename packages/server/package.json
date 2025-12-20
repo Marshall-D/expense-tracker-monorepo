@@ -12,6 +12,7 @@
   "dependencies": {
     "aws-lambda": "^1.0.7",
     "body-parser": "^2.2.1",
+    "bson": "^7.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.0.0",
     "express": "^5.2.1",

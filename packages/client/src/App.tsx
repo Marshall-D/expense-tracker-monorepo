@@ -12,7 +12,10 @@ export default function App() {
         (import.meta as any).env?.VITE_API_URL ?? "http://localhost:3000";
 
       try {
-        const res = await fetch(`${base}/api/health`);
+        // const res = await fetch(`${base}/api/health`);
+        const res = await fetch(
+          `https://uphk9dlqh2.execute-api.us-east-1.amazonaws.com/api/health`
+        );
 
         // If component unmounted while fetching, bail out
         if (!mounted) return;

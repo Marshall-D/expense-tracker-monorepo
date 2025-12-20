@@ -1,4 +1,10 @@
 #  packages/server/serverless.yml
+
+package:
+  patterns:
+    - "dist/**"
+    - "node_modules/**"
+
 service: expense-tracker-api
 frameworkVersion: "3"
 
@@ -6,15 +12,25 @@ provider:
   name: aws
   runtime: nodejs20.x
   region: us-east-1
+  profile: expense-tracker
+
+  httpApi:
+    cors:
+      allowedOrigins:
+        - "*"
+      allowedHeaders:
+        - "Content-Type"
+        - "Authorization"
+      allowedMethods:
+        - GET
+        - OPTIONS
+
   environment:
     MONGO_URI: ${env:MONGO_URI, ''}
 
-plugins:
-  - serverless-offline
-
 functions:
   health:
-    handler: packages/server/src/handlers/health.handler
+    handler: dist/handlers/health.handler
     events:
       - httpApi:
           path: /api/health

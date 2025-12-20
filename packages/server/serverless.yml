@@ -1,12 +1,10 @@
-#  packages/server/serverless.yml
+# packages/server/serverless.yml
+service: expense-tracker-api
+frameworkVersion: "3"
 
 package:
   patterns:
     - "dist/**"
-    - "node_modules/**"
-
-service: expense-tracker-api
-frameworkVersion: "3"
 
 provider:
   name: aws
@@ -28,9 +26,20 @@ provider:
   environment:
     MONGO_URI: ${env:MONGO_URI, ''}
 
+plugins:
+  - serverless-esbuild
+
+custom:
+  esbuild:
+    bundle: true
+    minify: false
+    sourcemap: true
+    target: node20
+    platform: node
+
 functions:
   health:
-    handler: dist/handlers/health.handler
+    handler: src/handlers/health.handler
     events:
       - httpApi:
           path: /api/health

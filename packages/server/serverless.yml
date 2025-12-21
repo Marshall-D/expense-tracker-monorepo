@@ -23,6 +23,7 @@ provider:
         - "Authorization"
       allowedMethods:
         - GET
+        - POST
         - OPTIONS
 
 plugins:
@@ -43,3 +44,9 @@ functions:
       - httpApi:
           path: /api/health
           method: get
+  authRegister:
+    handler: src/handlers/auth.register
+    events:
+      - httpApi:
+          path: /api/auth/register
+          method: post

@@ -7,7 +7,7 @@ import cors from "cors";
 
 // import handlers (ensure these files exist)
 import { handler as healthHandler } from "./handlers/health";
-import { register as authRegister } from "./handlers/auth";
+import { register as authRegister, login } from "./handlers/auth";
 
 const app = express();
 app.use(bodyParser.json());
@@ -86,6 +86,21 @@ app.post("/api/auth/register", async (req, res) => {
     return sendApiResponse(res, result);
   } catch (err) {
     console.error("local-dev auth.register handler error", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const event = toApiGatewayEvent(req);
+    const result = (await login(
+      event as any,
+      {} as any,
+      () => null
+    )) as APIGatewayProxyResult | void;
+    return sendApiResponse(res, result);
+  } catch (err) {
+    console.error("local-dev auth.login handler error", err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });

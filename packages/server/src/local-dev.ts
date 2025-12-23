@@ -10,6 +10,7 @@ import { handler as healthHandler } from "./handlers/health";
 import { register as authRegister, login } from "./handlers/auth";
 import { handler as createExpenseHandler } from "./handlers/createExpenses"; // <-- new import
 import { handler as getAllExpensesHandler } from "./handlers/getAllExpenses";
+import { handler as updateExpensesHandler } from "./handlers/updateExpenses";
 
 const app = express();
 app.use(bodyParser.json());
@@ -135,6 +136,26 @@ app.get("/api/expenses", async (req, res) => {
     return sendApiResponse(res, result);
   } catch (err) {
     console.error("local-dev expenses.getAll handler error", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// PUT /api/expenses/:id (update)
+app.put("/api/expenses/:id", async (req, res) => {
+  try {
+    // include body + path params when building APIGateway-like event
+    const event = toApiGatewayEvent(req);
+    // express path param is in req.params; toApiGatewayEvent currently doesn't attach pathParameters,
+    // so add them manually to the event object:
+    (event as any).pathParameters = req.params || {};
+    const result = (await updateExpensesHandler(
+      event as any,
+      {} as any,
+      () => null
+    )) as any;
+    return sendApiResponse(res, result);
+  } catch (err) {
+    console.error("local-dev expenses.update handler error", err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });

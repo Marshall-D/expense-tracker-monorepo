@@ -65,3 +65,9 @@ functions:
       - httpApi:
           path: /api/expenses
           method: get
+  updateExpenses:
+    handler: src/handlers/updateExpenses.handler
+    events:
+      - httpApi:
+          path: /api/expenses/{id}
+          method: put

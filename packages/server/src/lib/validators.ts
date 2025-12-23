@@ -39,3 +39,14 @@ export const createExpenseSchema = z.object({
   category: z.string().min(1, "category is required").optional(),
   date: z.string().optional(), // accept optional ISO string; handler will convert to Date
 });
+
+/**
+ * Update expense schema
+ * - Allows a partial update of the createExpenseSchema fields.
+ * - Requires at least one field to be present.
+ */
+export const updateExpenseSchema = createExpenseSchema
+  .partial()
+  .refine((obj) => obj && Object.keys(obj).length > 0, {
+    message: "At least one field must be provided to update.",
+  });

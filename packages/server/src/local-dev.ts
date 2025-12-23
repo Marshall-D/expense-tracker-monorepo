@@ -9,6 +9,7 @@ import cors from "cors";
 import { handler as healthHandler } from "./handlers/health";
 import { register as authRegister, login } from "./handlers/auth";
 import { handler as createExpenseHandler } from "./handlers/createExpenses"; // <-- new import
+import { handler as getAllExpensesHandler } from "./handlers/getAllExpenses";
 
 const app = express();
 app.use(bodyParser.json());
@@ -118,6 +119,22 @@ app.post("/api/expenses", async (req, res) => {
     return sendApiResponse(res, result);
   } catch (err) {
     console.error("local-dev expenses.create handler error", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/expenses (list) - uses APIGateway-style handler
+app.get("/api/expenses", async (req, res) => {
+  try {
+    const event = toApiGatewayEvent(req);
+    const result = (await getAllExpensesHandler(
+      event as any,
+      {} as any,
+      () => null
+    )) as any;
+    return sendApiResponse(res, result);
+  } catch (err) {
+    console.error("local-dev expenses.getAll handler error", err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });

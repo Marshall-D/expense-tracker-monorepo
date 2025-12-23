@@ -59,3 +59,9 @@ functions:
       - httpApi:
           path: /api/expenses
           method: post
+  getAllExpenses:
+    handler: src/handlers/getAllExpenses.handler
+    events:
+      - httpApi:
+          path: /api/expenses
+          method: get

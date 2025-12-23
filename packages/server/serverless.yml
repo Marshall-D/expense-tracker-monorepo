@@ -71,3 +71,10 @@ functions:
       - httpApi:
           path: /api/expenses/{id}
           method: put
+
+  deleteExpense:
+    handler: src/handlers/deleteExpense.handler
+    events:
+      - httpApi:
+          path: /api/expenses/{id}
+          method: delete

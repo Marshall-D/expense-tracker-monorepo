@@ -11,6 +11,7 @@ import { register as authRegister, login } from "./handlers/auth";
 import { handler as createExpenseHandler } from "./handlers/createExpenses"; // <-- new import
 import { handler as getAllExpensesHandler } from "./handlers/getAllExpenses";
 import { handler as updateExpensesHandler } from "./handlers/updateExpenses";
+import { handler as deleteExpenseHandler } from "./handlers/deleteExpense";
 
 const app = express();
 app.use(bodyParser.json());
@@ -156,6 +157,24 @@ app.put("/api/expenses/:id", async (req, res) => {
     return sendApiResponse(res, result);
   } catch (err) {
     console.error("local-dev expenses.update handler error", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// DELETE /api/expenses/:id (delete)
+app.delete("/api/expenses/:id", async (req, res) => {
+  try {
+    const event = toApiGatewayEvent(req);
+    // attach pathParameters (toApiGatewayEvent doesn't currently do this)
+    (event as any).pathParameters = req.params || {};
+    const result = (await deleteExpenseHandler(
+      event as any,
+      {} as any,
+      () => null
+    )) as any;
+    return sendApiResponse(res, result);
+  } catch (err) {
+    console.error("local-dev expenses.delete handler error", err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });

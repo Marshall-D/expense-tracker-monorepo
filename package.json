@@ -9,7 +9,7 @@
     "dev": "concurrently \"pnpm --filter server start:offline\" \"pnpm --filter client dev\"",
     "typecheck": "pnpm -w -r run typecheck",
     "lint": "pnpm -w -r run lint",
-    "deploy:server": "pnpm --filter server run deploy",
+    "deploy:server": "bash packages/server/src/scripts/deploy-live.sh",
     "deploy:client:s3": "pnpm --filter client run deploy:s3"
   }
 }

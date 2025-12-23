@@ -2,10 +2,6 @@
 service: expense-tracker-api
 frameworkVersion: "3"
 
-package:
-  patterns:
-    - "dist/**"
-
 provider:
   name: aws
   runtime: nodejs20.x
@@ -56,4 +52,10 @@ functions:
     events:
       - httpApi:
           path: /api/auth/login
+          method: post
+  createExpense:
+    handler: src/handlers/createExpenses.handler
+    events:
+      - httpApi:
+          path: /api/expenses
           method: post

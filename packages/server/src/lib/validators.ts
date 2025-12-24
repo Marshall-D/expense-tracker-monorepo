@@ -3,9 +3,6 @@ import { z } from "zod";
 
 /**
  * Register schema
- * - name: non-empty string
- * - email: validated email
- * - password: min 6 chars
  */
 export const registerSchema = z.object({
   name: z.string().min(1, "name is required"),
@@ -22,9 +19,17 @@ export const loginSchema = z.object({
 });
 
 /**
+ * Helper: 24-hex ObjectId string validator
+ */
+const objectIdString = z.string().refine((s) => /^[0-9a-fA-F]{24}$/.test(s), {
+  message: "must be a 24-character hex string",
+});
+
+/**
  * Create expense schema
  * Accept numbers passed as strings by preprocessing
  * date: optional ISO string
+ * categoryId: optional 24-hex string representing ObjectId
  */
 export const createExpenseSchema = z.object({
   amount: z.preprocess((val) => {
@@ -36,7 +41,9 @@ export const createExpenseSchema = z.object({
   }, z.number().positive("amount must be a positive number")),
   currency: z.string().optional(),
   description: z.string().optional(),
-  category: z.string().min(1, "category is required").optional(),
+  // Accept either category name or categoryId (or both). Both optional to avoid breaking clients.
+  category: z.string().min(1).optional(),
+  categoryId: objectIdString.optional(),
   date: z.string().optional(), // accept optional ISO string; handler will convert to Date
 });
 

@@ -8,10 +8,6 @@ import { z } from "zod";
 
 /**
  * Query schema for GET /api/expenses
- * - from, to: ISO date strings (optional)
- * - category: string (optional)
- * - limit: number (optional, default 20, max 100)
- * - page: number (optional, default 1)
  */
 const getAllExpensesQuerySchema = z.object({
   from: z
@@ -27,6 +23,12 @@ const getAllExpensesQuerySchema = z.object({
       message: "invalid to date",
     }),
   category: z.string().min(1).optional(),
+  categoryId: z
+    .string()
+    .optional()
+    .refine((s) => !s || /^[0-9a-fA-F]{24}$/.test(s), {
+      message: "invalid categoryId",
+    }),
   limit: z
     .union([z.string(), z.number()])
     .optional()
@@ -46,18 +48,11 @@ const getAllExpensesQuerySchema = z.object({
 });
 
 const getAllExpensesImpl: APIGatewayProxyHandler = async (event) => {
-  // Allow preflight early (requireAuth wrapper also handles OPTIONS)
-  if (event.httpMethod === "OPTIONS") {
-    return jsonResponse(204, {});
-  }
+  if (event.httpMethod === "OPTIONS") return jsonResponse(204, {});
 
-  // require auth (authorizer attached by requireAuth)
   const userId = (event.requestContext as any)?.authorizer?.userId;
-  if (!userId) {
-    return jsonResponse(401, { error: "unauthorized" });
-  }
+  if (!userId) return jsonResponse(401, { error: "unauthorized" });
 
-  // parse & validate query parameters
   const rawQs = (event.queryStringParameters || {}) as Record<string, string>;
   const parsed = getAllExpensesQuerySchema.safeParse(rawQs);
   if (!parsed.success) {
@@ -75,6 +70,7 @@ const getAllExpensesImpl: APIGatewayProxyHandler = async (event) => {
     from,
     to,
     category,
+    categoryId,
     limit: maybeLimit,
     page: maybePage,
   } = parsed.data;
@@ -97,21 +93,18 @@ const getAllExpensesImpl: APIGatewayProxyHandler = async (event) => {
     // build query
     const filter: any = { userId: new ObjectId(userId) };
 
-    if (category) {
+    if (categoryId) {
+      filter.categoryId = new ObjectId(categoryId);
+    } else if (category) {
       filter.category = category;
     }
 
     if (from || to) {
       filter.date = {};
-      if (from) {
-        filter.date.$gte = new Date(from);
-      }
-      if (to) {
-        filter.date.$lte = new Date(to);
-      }
+      if (from) filter.date.$gte = new Date(from);
+      if (to) filter.date.$lte = new Date(to);
     }
 
-    // total count for pagination
     const total = await expenses.countDocuments(filter);
 
     const cursor = expenses
@@ -122,7 +115,6 @@ const getAllExpensesImpl: APIGatewayProxyHandler = async (event) => {
 
     const docs = await cursor.toArray();
 
-    // sanitize/serialize documents for client
     const items = docs.map((d: any) => ({
       id: String(d._id),
       userId: d.userId ? String(d.userId) : null,
@@ -130,6 +122,7 @@ const getAllExpensesImpl: APIGatewayProxyHandler = async (event) => {
       currency: d.currency,
       description: d.description,
       category: d.category,
+      categoryId: d.categoryId ? String(d.categoryId) : null,
       date: d.date ? new Date(d.date).toISOString() : null,
       createdAt: d.createdAt ? new Date(d.createdAt).toISOString() : null,
     }));

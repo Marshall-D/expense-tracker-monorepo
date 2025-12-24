@@ -5,20 +5,11 @@ import { jsonResponse } from "../lib/validation";
 import { getDb } from "../lib/mongo";
 import { ObjectId } from "mongodb";
 
-/**
- * GET /api/expenses/{id}
- * Protected — only the owner may read.
- */
 const getExpenseImpl: APIGatewayProxyHandler = async (event) => {
-  // allow preflight (requireAuth also handles OPTIONS)
-  if (event.httpMethod === "OPTIONS") {
-    return jsonResponse(204, {});
-  }
+  if (event.httpMethod === "OPTIONS") return jsonResponse(204, {});
 
   const userId = (event.requestContext as any)?.authorizer?.userId;
-  if (!userId) {
-    return jsonResponse(401, { error: "unauthorized" });
-  }
+  if (!userId) return jsonResponse(401, { error: "unauthorized" });
 
   const pathParams = (event.pathParameters || {}) as Record<
     string,
@@ -32,7 +23,6 @@ const getExpenseImpl: APIGatewayProxyHandler = async (event) => {
     });
   }
 
-  // validate ObjectId
   let expenseObjectId: ObjectId;
   try {
     expenseObjectId = new ObjectId(id);
@@ -65,7 +55,6 @@ const getExpenseImpl: APIGatewayProxyHandler = async (event) => {
       });
     }
 
-    // serialize for client
     const payload = {
       id: String(doc._id),
       userId: doc.userId ? String(doc.userId) : null,
@@ -73,6 +62,7 @@ const getExpenseImpl: APIGatewayProxyHandler = async (event) => {
       currency: doc.currency,
       description: doc.description,
       category: doc.category,
+      categoryId: doc.categoryId ? String(doc.categoryId) : null,
       date: doc.date ? new Date(doc.date).toISOString() : null,
       createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : null,
       updatedAt: doc.updatedAt ? new Date(doc.updatedAt).toISOString() : null,

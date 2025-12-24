@@ -1,4 +1,4 @@
-// packages/server/src/handlers/expenses.create.ts
+// packages/server/src/handlers/creatExpenses.ts
 import type { APIGatewayProxyHandler } from "aws-lambda";
 import { requireAuth } from "../lib/requireAuth";
 import { parseAndValidate, jsonResponse } from "../lib/validation";
@@ -7,7 +7,6 @@ import { getDb } from "../lib/mongo";
 import { ObjectId } from "mongodb";
 
 const createExpenseImpl: APIGatewayProxyHandler = async (event) => {
-  // OPTIONS preflight handled by requireAuth wrapper too, but keep check for safety
   if (event.httpMethod === "OPTIONS") {
     return {
       statusCode: 204,
@@ -20,16 +19,21 @@ const createExpenseImpl: APIGatewayProxyHandler = async (event) => {
     };
   }
 
-  // parse + validate body using zod helper
   const parsed = parseAndValidate(createExpenseSchema, event);
   if (!parsed.ok) return parsed.response;
 
-  const { amount, currency, description, category, date } = parsed.data;
+  const { amount, currency, description, category, date, categoryId } =
+    parsed.data as {
+      amount: number;
+      currency?: string;
+      description?: string;
+      category?: string;
+      categoryId?: string;
+      date?: string;
+    };
 
-  // requireAuth attached authorizer on the event.requestContext
   const userId = (event.requestContext as any)?.authorizer?.userId;
   if (!userId) {
-    // This should rarely happen because requireAuth returns 401 earlier, but defensive check:
     return jsonResponse(401, { error: "unauthorized" });
   }
 
@@ -42,14 +46,67 @@ const createExpenseImpl: APIGatewayProxyHandler = async (event) => {
   }
 
   try {
+    const categoriesColl = db.collection("categories");
     const expenses = db.collection("expenses");
+
+    // Resolve categoryId and normalized category name
+    let resolvedCategoryId: ObjectId | null = null;
+    let resolvedCategoryName: string = category ?? "Uncategorized";
+
+    // 1) If categoryId provided, validate it exists and is accessible
+    if (categoryId) {
+      try {
+        const cid = new ObjectId(categoryId);
+        const cat = await categoriesColl.findOne({
+          _id: cid,
+          $or: [{ userId: new ObjectId(userId) }, { userId: null }],
+        });
+        if (!cat) {
+          return jsonResponse(400, {
+            error: "invalid_category",
+            message: "Category not found or not accessible.",
+          });
+        }
+        resolvedCategoryId = cid;
+        resolvedCategoryName = cat.name;
+      } catch {
+        return jsonResponse(400, {
+          error: "invalid_category_id",
+          message: "categoryId is not a valid ObjectId.",
+        });
+      }
+    } else if (category && category.trim()) {
+      // 2) If only category name provided, try to find user-specific then global
+      const userCat = await categoriesColl.findOne({
+        name: category,
+        userId: new ObjectId(userId),
+      });
+      const globalCat =
+        !userCat &&
+        (await categoriesColl.findOne({
+          name: category,
+          userId: null,
+        }));
+
+      const cat = userCat || globalCat;
+      if (cat) {
+        resolvedCategoryId = cat._id;
+        resolvedCategoryName = cat.name;
+      } else {
+        // Not found -> store string only (optional: auto-create category here)
+        resolvedCategoryId = null;
+        resolvedCategoryName = category;
+      }
+    }
+
     const now = new Date();
-    const expenseDoc = {
+    const expenseDoc: any = {
       userId: new ObjectId(userId),
       amount,
       currency: currency ?? "USD",
       description: description ?? "",
-      category: category ?? "Uncategorized",
+      category: resolvedCategoryName,
+      categoryId: resolvedCategoryId,
       date: date ? new Date(date) : now,
       createdAt: now,
     };
@@ -65,5 +122,4 @@ const createExpenseImpl: APIGatewayProxyHandler = async (event) => {
   }
 };
 
-// export the guarded handler
 export const handler = requireAuth(createExpenseImpl);

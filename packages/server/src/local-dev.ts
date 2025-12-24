@@ -23,6 +23,10 @@ import { handler as getAllBudgetsHandler } from "./handlers/getAllBudgets";
 import { handler as getBudgetHandler } from "./handlers/getBudget";
 import { handler as updateBudgetHandler } from "./handlers/updateBudget";
 import { handler as deleteBudgetHandler } from "./handlers/deleteBudget";
+import { handler as reportsMonthlyHandler } from "./handlers/monthlyReports";
+import { handler as reportsByCategoryHandler } from "./handlers/categoryReports";
+import { handler as reportsTrendsHandler } from "./handlers/trendReports";
+import { handler as expensesExportHandler } from "./handlers/expensesReport";
 
 const app = express();
 app.use(bodyParser.json());
@@ -365,6 +369,70 @@ app.put("/api/budgets/:id", async (req, res) => {
     return sendApiResponse(res, result);
   } catch (err) {
     console.error("local-dev budgets.update handler error", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/reports/monthly
+app.get("/api/reports/monthly", async (req, res) => {
+  try {
+    const event = toApiGatewayEvent(req);
+    const result = (await reportsMonthlyHandler(
+      event as any,
+      {} as any,
+      () => null
+    )) as any;
+    return sendApiResponse(res, result);
+  } catch (err) {
+    console.error("local-dev reports.monthly handler error", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/reports/by-category
+app.get("/api/reports/by-category", async (req, res) => {
+  try {
+    const event = toApiGatewayEvent(req);
+    const result = (await reportsByCategoryHandler(
+      event as any,
+      {} as any,
+      () => null
+    )) as any;
+    return sendApiResponse(res, result);
+  } catch (err) {
+    console.error("local-dev reports.byCategory handler error", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/reports/trends
+app.get("/api/reports/trends", async (req, res) => {
+  try {
+    const event = toApiGatewayEvent(req);
+    const result = (await reportsTrendsHandler(
+      event as any,
+      {} as any,
+      () => null
+    )) as any;
+    return sendApiResponse(res, result);
+  } catch (err) {
+    console.error("local-dev reports.trends handler error", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/expenses/export
+app.get("/api/expenses/export", async (req, res) => {
+  try {
+    const event = toApiGatewayEvent(req);
+    const result = (await expensesExportHandler(
+      event as any,
+      {} as any,
+      () => null
+    )) as any;
+    return sendApiResponse(res, result);
+  } catch (err) {
+    console.error("local-dev expenses.export handler error", err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });

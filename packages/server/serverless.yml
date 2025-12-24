@@ -148,3 +148,27 @@ functions:
       - httpApi:
           path: /api/budgets/{id}
           method: delete
+  reportsMonthly:
+    handler: src/handlers/monthlyReports.handler
+    events:
+      - httpApi:
+          path: /api/reports/monthly
+          method: get
+  reportsByCategory:
+    handler: src/handlers/categoryReports.handler
+    events:
+      - httpApi:
+          path: /api/reports/by-category
+          method: get
+  reportsTrends:
+    handler: src/handlers/trendReports.handler
+    events:
+      - httpApi:
+          path: /api/reports/trends
+          method: get
+  expensesExport:
+    handler: src/handlers/expensesReport.handler
+    events:
+      - httpApi:
+          path: /api/expenses/export
+          method: get

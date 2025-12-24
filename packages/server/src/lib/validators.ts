@@ -36,7 +36,7 @@ export const createExpenseSchema = z.object({
     }
     return val;
   }, z.number().positive("amount must be a positive number")),
-  currency: z.string().optional(),
+  currency: z.enum(["USD", "NGN"]).optional(),
   description: z.string().optional(),
   category: z.string().min(1).optional(),
   categoryId: objectIdString.optional(),

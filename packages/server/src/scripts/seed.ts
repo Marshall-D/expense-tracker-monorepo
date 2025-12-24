@@ -34,7 +34,10 @@ async function main() {
     await users.createIndex({ email: 1 }, { unique: true });
     await expenses.createIndex({ userId: 1, date: -1 });
     await expenses.createIndex({ userId: 1, categoryId: 1 });
-    await categories.createIndex({ userId: 1, name: 1 });
+    await categories.createIndex(
+      { name: 1 },
+      { unique: true, collation: { locale: "en", strength: 2 } }
+    );
     await budgets.createIndex({ userId: 1, category: 1 }, { unique: true });
 
     // Seed global categories (userId: null)

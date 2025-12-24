@@ -84,3 +84,37 @@ functions:
       - httpApi:
           path: /api/expenses/{id}
           method: get
+
+  createCategory:
+    handler: src/handlers/createCategories.handler
+    events:
+      - httpApi:
+          path: /api/categories
+          method: post
+
+  getAllCategories:
+    handler: src/handlers/getAllCategories.handler
+    events:
+      - httpApi:
+          path: /api/categories
+          method: get
+  getCategory:
+    handler: src/handlers/getCategory.handler
+    events:
+      - httpApi:
+          path: /api/categories/{id}
+          method: get
+
+  updateCategory:
+    handler: src/handlers/updateCategories.handler
+    events:
+      - httpApi:
+          path: /api/categories/{id}
+          method: put
+
+  deleteCategory:
+    handler: src/handlers/deleteCategory.handler
+    events:
+      - httpApi:
+          path: /api/categories/{id}
+          method: delete

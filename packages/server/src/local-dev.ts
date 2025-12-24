@@ -13,6 +13,11 @@ import { handler as getAllExpensesHandler } from "./handlers/getAllExpenses";
 import { handler as updateExpensesHandler } from "./handlers/updateExpenses";
 import { handler as deleteExpenseHandler } from "./handlers/deleteExpense";
 import { handler as getExpenseHandler } from "./handlers/getExpense";
+import { handler as createCategoryHandler } from "./handlers/createCategories";
+import { handler as getAllCategoriesHandler } from "./handlers/getAllCategories";
+import { handler as getCategoryHandler } from "./handlers/getCategory";
+import { handler as updateCategoriesHandler } from "./handlers/updateCategories";
+import { handler as deleteCategoryHandler } from "./handlers/deleteCategory";
 
 const app = express();
 app.use(bodyParser.json());
@@ -194,6 +199,89 @@ app.get("/api/expenses/:id", async (req, res) => {
     return sendApiResponse(res, result);
   } catch (err) {
     console.error("local-dev expenses.get handler error", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/categories
+app.post("/api/categories", async (req, res) => {
+  try {
+    const event = toApiGatewayEvent(req);
+    const result = (await createCategoryHandler(
+      event as any,
+      {} as any,
+      () => null
+    )) as APIGatewayProxyResult | void;
+    return sendApiResponse(res, result);
+  } catch (err) {
+    console.error("local-dev categories.create handler error", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/categories
+app.get("/api/categories", async (req, res) => {
+  try {
+    const event = toApiGatewayEvent(req);
+    const result = (await getAllCategoriesHandler(
+      event as any,
+      {} as any,
+      () => null
+    )) as APIGatewayProxyResult | void;
+    return sendApiResponse(res, result);
+  } catch (err) {
+    console.error("local-dev categories.getAll handler error", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/categories/:id
+app.get("/api/categories/:id", async (req, res) => {
+  try {
+    const event = toApiGatewayEvent(req);
+    (event as any).pathParameters = req.params || {};
+    const result = (await getCategoryHandler(
+      event as any,
+      {} as any,
+      () => null
+    )) as APIGatewayProxyResult | void;
+    return sendApiResponse(res, result);
+  } catch (err) {
+    console.error("local-dev categories.get handler error", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// PUT /api/categories/:id
+app.put("/api/categories/:id", async (req, res) => {
+  try {
+    const event = toApiGatewayEvent(req);
+    (event as any).pathParameters = req.params || {};
+    const result = (await updateCategoriesHandler(
+      event as any,
+      {} as any,
+      () => null
+    )) as APIGatewayProxyResult | void;
+    return sendApiResponse(res, result);
+  } catch (err) {
+    console.error("local-dev categories.update handler error", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// DELETE /api/categories/:id
+app.delete("/api/categories/:id", async (req, res) => {
+  try {
+    const event = toApiGatewayEvent(req);
+    (event as any).pathParameters = req.params || {};
+    const result = (await deleteCategoryHandler(
+      event as any,
+      {} as any,
+      () => null
+    )) as APIGatewayProxyResult | void;
+    return sendApiResponse(res, result);
+  } catch (err) {
+    console.error("local-dev categories.delete handler error", err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });

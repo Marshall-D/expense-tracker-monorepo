@@ -1,15 +1,19 @@
-// src/pages/LandingPage.tsx
+// src/pages/App.tsx
 import React from "react";
-import { Link } from "react-router-dom"; // Vite + React (if you use a different router or plain anchors, replace this)
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, Wallet, PieChart, ShieldCheck } from "lucide-react";
+import ROUTES from "./utils/routes";
 
 export default function LandingPage(): JSX.Element {
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
       <header className="px-4 lg:px-6 h-16 flex items-center border-b border-border/40 backdrop-blur-md sticky top-0 z-50">
-        <Link className="flex items-center justify-center gap-2" to="/">
+        <Link
+          className="flex items-center justify-center gap-2"
+          to={ROUTES.HOME}
+        >
           <Wallet className="h-6 w-6 text-primary" />
           <span className="font-bold tracking-tight text-xl">LuxeSpend</span>
         </Link>
@@ -17,13 +21,13 @@ export default function LandingPage(): JSX.Element {
         <nav className="ml-auto flex gap-4 sm:gap-6">
           <Link
             className="text-sm font-medium hover:text-primary transition-colors"
-            to="/login"
+            to={ROUTES.LOGIN}
           >
             Login
           </Link>
           <Link
             className="text-sm font-medium hover:text-primary transition-colors"
-            to="/register"
+            to={ROUTES.REGISTER}
           >
             Register
           </Link>
@@ -45,7 +49,7 @@ export default function LandingPage(): JSX.Element {
 
             <div className="flex flex-col sm:flex-row justify-center gap-4 mt-8">
               <Button asChild size="lg" className="rounded-full px-8">
-                <Link to="/register">
+                <Link to={ROUTES.REGISTER}>
                   Get Started <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
@@ -56,7 +60,7 @@ export default function LandingPage(): JSX.Element {
                 size="lg"
                 className="rounded-full px-8 bg-transparent"
               >
-                <Link to="/login">Sign In</Link>
+                <Link to={ROUTES.LOGIN}>Sign In</Link>
               </Button>
             </div>
           </div>

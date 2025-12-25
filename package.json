@@ -11,5 +11,11 @@
     "lint": "pnpm -w -r run lint",
     "deploy:server": "bash packages/server/src/scripts/deploy-live.sh",
     "deploy:client:s3": "pnpm --filter client run deploy:s3"
+  },
+  "dependencies": {
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.562.0",
+    "tailwind-merge": "^3.4.0"
   }
 }

@@ -11,6 +11,7 @@ import ExpensesPage from "./pages/expenses";
 import BudgetsPage from "./pages/budgets";
 import CategoriesPage from "./pages/categories";
 import DashboardLayout from "./layouts/dashboardLayout";
+import ReportsPage from "./pages/reports";
 // import Dashboard from "@/pages/dashboard";       // if exists
 
 export default function App() {
@@ -28,7 +29,7 @@ export default function App() {
         {/* /dashboard/budgets */}
         <Route path="categories" element={<CategoriesPage />} />
         {/* /dashboard/categories */}
-        {/* <Route path="reports" element={<ReportsPage />} /> /dashboard/reports */}
+        <Route path="reports" element={<ReportsPage />} /> /dashboard/reports
       </Route>
 
       {/* fallback */}

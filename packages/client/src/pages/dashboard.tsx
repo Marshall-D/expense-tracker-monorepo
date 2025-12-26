@@ -7,18 +7,18 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-// import {
-//   BarChart,
-//   Bar,
-//   XAxis,
-//   YAxis,
-//   CartesianGrid,
-//   Tooltip,
-//   ResponsiveContainer,
-//   Cell,
-//   PieChart,
-//   Pie,
-// } from "recharts";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  PieChart,
+  Pie,
+} from "recharts";
 import {
   TrendingUp,
   TrendingDown,
@@ -132,12 +132,25 @@ export default function DashboardPage() {
               Daily spending analysis across the current month.
             </CardDescription>
           </CardHeader>
-          {/* <CardContent className="h-[300px]">
+          <CardContent className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: "oklch(0.7 0.01 260)", fontSize: 12 }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: "oklch(0.7 0.01 260)", fontSize: 12 }} />
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  stroke="rgba(255,255,255,0.05)"
+                />
+                <XAxis
+                  dataKey="month"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: "oklch(0.7 0.01 260)", fontSize: 12 }}
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: "oklch(0.7 0.01 260)", fontSize: 12 }}
+                />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: "oklch(0.22 0.02 260)",
@@ -146,10 +159,14 @@ export default function DashboardPage() {
                   }}
                   itemStyle={{ color: "oklch(0.95 0.01 260)" }}
                 />
-                <Bar dataKey="amount" fill="var(--color-brand-gold)" radius={[4, 4, 0, 0]} />
+                <Bar
+                  dataKey="amount"
+                  fill="var(--color-brand-gold)"
+                  radius={[4, 4, 0, 0]}
+                />
               </BarChart>
             </ResponsiveContainer>
-          </CardContent> */}
+          </CardContent>
         </Card>
 
         <Card className="col-span-3 border-border/40 bg-card/40">
@@ -159,12 +176,24 @@ export default function DashboardPage() {
               Spending by category for December 2025.
             </CardDescription>
           </CardHeader>
-          {/* <CardContent className="h-[300px]">
+          <CardContent className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={categoryData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                <Pie
+                  data={categoryData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
                   {categoryData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={entry.color}
+                      stroke="none"
+                    />
                   ))}
                 </Pie>
                 <Tooltip
@@ -180,12 +209,17 @@ export default function DashboardPage() {
             <div className="grid grid-cols-2 gap-2 mt-4 px-4">
               {categoryData.map((item) => (
                 <div key={item.name} className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
-                  <span className="text-xs text-muted-foreground">{item.name}</span>
+                  <div
+                    className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: item.color }}
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    {item.name}
+                  </span>
                 </div>
               ))}
             </div>
-          </CardContent> */}
+          </CardContent>
         </Card>
       </div>
     </div>

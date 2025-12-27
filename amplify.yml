@@ -6,7 +6,7 @@ applications:
         preBuild:
           commands:
             - corepack enable
-            - pnpm install --frozen-lockfile --workspace-root
+            - NPM_CONFIG_PRODUCTION=false pnpm install --frozen-lockfile --workspace-root
         build:
           commands:
             - pnpm --filter client run build

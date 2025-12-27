@@ -1,6 +1,6 @@
 version: 1
 applications:
-  - appRoot: /
+  - appRoot: packages/client
     frontend:
       phases:
         preBuild:
@@ -16,5 +16,6 @@ applications:
           - "**/*"
       cache:
         paths:
+          - "~/.pnpm-store/**"
           - node_modules/**/*
           - packages/**/node_modules/**/*

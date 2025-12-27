@@ -1,6 +1,6 @@
-// src/pages/expenses.tsx
+// packages/client/src/pages/expenses/expenses.tsx
 import React, { Suspense, useState } from "react";
-import { useSearchParams, useLocation } from "react-router-dom";
+import { Link, useSearchParams, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Search, Filter, Plus, Pencil, Trash2, Download } from "lucide-react";
+import ROUTES from "@/utils/routes";
 
 const dummyExpenses = [
   {
@@ -81,6 +82,7 @@ function ExpensesContent() {
             Manage and track your individual spending records.
           </p>
         </div>
+
         <div className="flex gap-2">
           <Button
             variant="outline"
@@ -89,8 +91,12 @@ function ExpensesContent() {
           >
             <Download className="h-4 w-4" /> Export CSV
           </Button>
-          <Button size="sm" className="rounded-full gap-2">
-            <Plus className="h-4 w-4" /> Add New
+
+          {/* Add New -> /dashboard/expenses/new */}
+          <Button asChild size="sm" className="rounded-full gap-2">
+            <Link to={ROUTES.EXPENSES_NEW}>
+              <Plus className="h-4 w-4" /> Add New
+            </Link>
           </Button>
         </div>
       </div>
@@ -163,19 +169,29 @@ function ExpensesContent() {
                         {expense.currency === "USD" ? "$" : "₦"}
                         {expense.amount.toLocaleString()}
                       </TableCell>
+
                       <TableCell>
                         <div className="flex justify-end gap-1">
+                          {/* Edit -> /dashboard/expenses/:id */}
                           <Button
+                            asChild
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 hover:text-primary"
                           >
-                            <Pencil className="h-4 w-4" />
+                            <Link to={ROUTES.EXPENSES_BY_ID(expense.id)}>
+                              <Pencil className="h-4 w-4" />
+                            </Link>
                           </Button>
+
                           <Button
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 hover:text-destructive"
+                            onClick={() => {
+                              if (confirm("Delete this expense?"))
+                                console.log("delete", expense.id);
+                            }}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>

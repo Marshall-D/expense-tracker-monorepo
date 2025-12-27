@@ -1,9 +1,11 @@
-// src/pages/categories.tsx
+// packages/client/src/pages/categories/categories.tsx
 import React from "react";
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Tags, Trash2 } from "lucide-react";
+import { Plus, Tags, Trash2, Pencil } from "lucide-react";
+import ROUTES from "@/utils/routes";
 
 const dummyCategories = [
   { id: "1", name: "Food", color: "#f87171", type: "Global" },
@@ -23,8 +25,12 @@ export default function CategoriesPage() {
             Manage spending classifications and custom labels.
           </p>
         </div>
-        <Button size="sm" className="rounded-full gap-2">
-          <Plus className="h-4 w-4" /> New Category
+
+        {/* New category -> /dashboard/categories/new */}
+        <Button asChild size="sm" className="rounded-full gap-2">
+          <Link to={ROUTES.CATEGORIES_NEW}>
+            <Plus className="h-4 w-4" /> New Category
+          </Link>
         </Button>
       </div>
 
@@ -55,18 +61,26 @@ export default function CategoriesPage() {
               <h3 className="text-lg font-bold mt-2">{category.name}</h3>
 
               <div className="flex items-center gap-2 mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                {/* Edit -> /dashboard/categories/:id */}
                 <Button
+                  asChild
                   variant="secondary"
                   size="sm"
                   className="h-8 rounded-lg flex-1 text-xs"
                 >
-                  Edit
+                  <Link to={ROUTES.CATEGORIES_BY_ID(category.id)}>Edit</Link>
                 </Button>
+
                 {category.type === "Custom" && (
                   <Button
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 text-destructive rounded-lg"
+                    onClick={() => {
+                      if (confirm(`Delete category "${category.name}"?`)) {
+                        console.log("delete category", category.id);
+                      }
+                    }}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>

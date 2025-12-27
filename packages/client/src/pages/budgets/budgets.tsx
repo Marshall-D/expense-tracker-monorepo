@@ -1,5 +1,6 @@
-// src/pages/budgets.tsx
+// packages/client/src/pages/budgets/budgets.tsx
 import React from "react";
+import { Link } from "react-router-dom";
 import {
   Card,
   CardContent,
@@ -10,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Plus, Pencil, Trash2, Wallet, AlertCircle } from "lucide-react";
+import ROUTES from "@/utils/routes";
 
 const dummyBudgets = [
   {
@@ -56,8 +58,12 @@ export default function BudgetsPage() {
             Set spending limits and track category performance.
           </p>
         </div>
-        <Button size="sm" className="rounded-full gap-2">
-          <Plus className="h-4 w-4" /> Set Budget
+
+        {/* navigate to: /dashboard/budgets/new */}
+        <Button asChild size="sm" className="rounded-full gap-2">
+          <Link to={ROUTES.BUDGETS_NEW}>
+            <Plus className="h-4 w-4" /> Set Budget
+          </Link>
         </Button>
       </div>
 
@@ -87,18 +93,31 @@ export default function BudgetsPage() {
                       <CardDescription>Monthly limit</CardDescription>
                     </div>
                   </div>
+
                   <div className="flex gap-1">
+                    {/* edit: goes to /dashboard/budgets/:id -> BudgetEditorPage reads `id` */}
                     <Button
+                      asChild
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 text-muted-foreground"
                     >
-                      <Pencil className="h-4 w-4" />
+                      <Link to={ROUTES.BUDGETS_BY_ID(budget.id)}>
+                        <Pencil className="h-4 w-4" />
+                      </Link>
                     </Button>
+
+                    {/* delete placeholder — keep as button for handler wiring */}
                     <Button
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 text-destructive/70"
+                      onClick={() => {
+                        if (confirm(`Delete budget for ${budget.category}?`)) {
+                          console.log("delete", budget.id);
+                          // TODO: call delete API and refresh list
+                        }
+                      }}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>

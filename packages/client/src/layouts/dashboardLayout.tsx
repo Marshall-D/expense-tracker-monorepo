@@ -1,4 +1,4 @@
-// src/layouts/DashboardLayout.tsx
+// packages/client/src/layouts/dashboardLayout.tsx
 import React, { useState } from "react";
 import { NavLink, Link, Outlet } from "react-router-dom";
 import ROUTES from "@/utils/routes";
@@ -53,13 +53,10 @@ function NavItem({
 
 export default function DashboardLayout(): JSX.Element {
   const [open, setOpen] = useState(false);
-
-  // close drawer when navigating (mobile)
   const handleNavigate = () => setOpen(false);
 
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Desktop Sidebar */}
       <aside className="w-64 border-r border-border/40 hidden md:flex flex-col sticky top-0 h-screen bg-card/30 backdrop-blur-md">
         <div className="p-6">
           <Link to={ROUTES.DASHBOARD} className="flex items-center gap-2">
@@ -90,12 +87,9 @@ export default function DashboardLayout(): JSX.Element {
         </div>
       </aside>
 
-      {/* Main column */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
         <header className="h-16 border-b border-border/40 flex items-center justify-between px-4 md:px-8 bg-background/50 backdrop-blur-sm sticky top-0 z-30">
           <div className="flex items-center gap-3">
-            {/* Mobile: hamburger */}
             <button
               aria-label="Open menu"
               onClick={() => setOpen(true)}
@@ -114,37 +108,35 @@ export default function DashboardLayout(): JSX.Element {
             <p className="text-sm text-muted-foreground hidden md:block">
               Welcome back, John Doe
             </p>
-            <Button size="sm" className="rounded-full px-4">
-              Add Expense
+
+            {/* Add Expense -> /dashboard/expenses/new */}
+            <Button asChild size="sm" className="rounded-full px-4">
+              <Link to={ROUTES.EXPENSES_NEW}>Add Expense</Link>
             </Button>
           </div>
         </header>
 
-        {/* Off-canvas mobile drawer */}
+        {/* off-canvas + main content remain unchanged */}
+        {/* ...rest of file unchanged... */}
         <div
           aria-hidden={!open}
           className={`fixed inset-0 z-40 md:hidden transition-opacity ${
             open ? "opacity-100" : "pointer-events-none opacity-0"
           }`}
         >
-          {/* backdrop */}
           <div
             className={`absolute inset-0 bg-black/40 transition-opacity ${
               open ? "opacity-100" : "opacity-0"
             }`}
             onClick={() => setOpen(false)}
           />
-
-          {/* panel */}
           <nav
             className={`absolute left-0 top-0 bottom-0 w-72 bg-card/90 backdrop-blur-md border-r border-border/40 transform transition-transform ${
               open ? "translate-x-0" : "-translate-x-full"
             }`}
             aria-label="Mobile menu"
           >
-            {/* make the panel a column so we can place logout at the bottom naturally */}
             <div className="flex flex-col h-full pb-28">
-              {/* header */}
               <div className="p-4 flex items-center justify-between border-b border-border/40">
                 <Link
                   to={ROUTES.DASHBOARD}
@@ -165,7 +157,6 @@ export default function DashboardLayout(): JSX.Element {
                 </button>
               </div>
 
-              {/* scrollable nav items */}
               <div className="p-4 space-y-1 overflow-auto flex-1">
                 {navItems.map((item) => (
                   <NavItem
@@ -179,7 +170,6 @@ export default function DashboardLayout(): JSX.Element {
                 ))}
               </div>
 
-              {/* logout: placed as a normal block so it's above the bottom nav because of pb-28 */}
               <div className="p-4 border-t border-border/40">
                 <Button
                   variant="ghost"
@@ -196,12 +186,10 @@ export default function DashboardLayout(): JSX.Element {
           </nav>
         </div>
 
-        {/* Page content */}
         <main className="p-4 md:p-8 overflow-y-auto">
           <Outlet />
         </main>
 
-        {/* Mobile bottom navigation (visible on small screens) */}
         <nav className="fixed bottom-4 left-4 right-4 md:hidden z-40">
           <div className="mx-auto max-w-3xl bg-card/80 backdrop-blur-md border border-border/40 rounded-full px-2 py-2 flex justify-between items-center shadow-lg">
             {navItems.map((item) => {

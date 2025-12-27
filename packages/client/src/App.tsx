@@ -1,18 +1,20 @@
+// packages/client/src/App.tsx
 import React from "react";
 import { Routes, Route } from "react-router-dom";
 import ROUTES from "@/utils/routes";
 
-// import LandingPage from "@/pages/LandingPage";    // new file above
-import LoginPage from "@/pages/auth/login"; // you already have this file
-import RegisterPage from "@/pages/auth/register"; // if exists
-import LandingPage from "./pages/landingPage";
-import DashboardPage from "./pages/dashboard";
-import ExpensesPage from "./pages/expenses";
-import BudgetsPage from "./pages/budgets";
-import CategoriesPage from "./pages/categories";
-import DashboardLayout from "./layouts/dashboardLayout";
-import ReportsPage from "./pages/reports";
-// import Dashboard from "@/pages/dashboard";       // if exists
+import LoginPage from "@/pages/auth/login";
+import RegisterPage from "@/pages/auth/register";
+import LandingPage from "@/pages/landingPage";
+import DashboardPage from "@/pages/dashboard";
+import ExpensesPage from "@/pages/expenses/expenses";
+import BudgetsPage from "@/pages/budgets/budgets";
+import CategoriesPage from "@/pages/categories/categories";
+import DashboardLayout from "@/layouts/dashboardLayout";
+import ReportsPage from "@/pages/reports";
+import ExpenseEditorPage from "./pages/expenses/expenseEditorPage";
+import BudgetEditorPage from "./pages/budgets/budgetEditorPage";
+import CategoryEditorPage from "./pages/categories/categoryEditorPage";
 
 export default function App() {
   return (
@@ -22,14 +24,24 @@ export default function App() {
       <Route path={ROUTES.REGISTER} element={<RegisterPage />} />
 
       <Route path={ROUTES.DASHBOARD} element={<DashboardLayout />}>
-        <Route index element={<DashboardPage />} /> {/* /dashboard */}
-        <Route path="expenses" element={<ExpensesPage />} />{" "}
-        {/* /dashboard/expenses */}
-        <Route path="budgets" element={<BudgetsPage />} />{" "}
-        {/* /dashboard/budgets */}
+        <Route index element={<DashboardPage />} />
+
+        {/* Expenses */}
+        <Route path="expenses" element={<ExpensesPage />} />
+        <Route path="expenses/new" element={<ExpenseEditorPage />} />
+        <Route path="expenses/:id" element={<ExpenseEditorPage />} />
+
+        {/* Budgets */}
+        <Route path="budgets" element={<BudgetsPage />} />
+        <Route path="budgets/new" element={<BudgetEditorPage />} />
+        <Route path="budgets/:id" element={<BudgetEditorPage />} />
+
+        {/* Categories */}
         <Route path="categories" element={<CategoriesPage />} />
-        {/* /dashboard/categories */}
-        <Route path="reports" element={<ReportsPage />} /> /dashboard/reports
+        <Route path="categories/new" element={<CategoryEditorPage />} />
+        <Route path="categories/:id" element={<CategoryEditorPage />} />
+
+        <Route path="reports" element={<ReportsPage />} />
       </Route>
 
       {/* fallback */}

@@ -1,4 +1,4 @@
-// src/pages/LoginPage.tsx
+// packages/client/src/pages/auth/login.tsx
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -14,20 +14,38 @@ import {
 } from "@/components/ui/card";
 import { Wallet } from "lucide-react";
 import ROUTES from "@/utils/routes";
+import { useLogin } from "@/hooks/useLogin";
 
 export default function LoginPage(): JSX.Element {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const mutation = useLogin();
+  const { mutateAsync, status } = mutation;
+  const isLoading = status === "pending";
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setLoading(true);
+    setFormError(null);
+    const form = new FormData(e.currentTarget);
+    const email = String(form.get("email") || "").trim();
+    const password = String(form.get("password") || "");
 
-    // Simulating API call — replace with real API call
-    setTimeout(() => {
-      setLoading(false);
+    if (!email || !password) {
+      setFormError("Email and password are required.");
+      return;
+    }
+
+    try {
+      await mutateAsync({ email, password });
       navigate(ROUTES.DASHBOARD);
-    }, 1000);
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        "Login failed";
+      setFormError(msg);
+    }
   };
 
   return (
@@ -49,6 +67,7 @@ export default function LoginPage(): JSX.Element {
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
+                name="email"
                 type="email"
                 placeholder="name@example.com"
                 required
@@ -60,18 +79,23 @@ export default function LoginPage(): JSX.Element {
               <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
+                name="password"
                 type="password"
                 required
                 className="bg-background/50"
               />
             </div>
 
+            {formError && (
+              <div className="text-sm text-destructive">{formError}</div>
+            )}
+
             <Button
               type="submit"
               className="w-full rounded-full"
-              disabled={loading}
+              disabled={isLoading}
             >
-              {loading ? "Signing in..." : "Login"}
+              {isLoading ? "Signing in..." : "Login"}
             </Button>
           </form>
         </CardContent>

@@ -1,0 +1,121 @@
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  getToken,
+  getUser,
+  removeToken,
+  removeUser,
+  setToken as storageSetToken,
+  setUser as storageSetUser,
+} from "@/lib/storage";
+import ROUTES from "@/utils/routes";
+import { queryKeys } from "@/lib/queryKeys";
+
+type User = { id: string; name: string; email: string } | null;
+
+type AuthContextValue = {
+  user: User;
+  token: string | null;
+  isAuthenticated: boolean;
+  setAuth: (user: User, token: string) => void;
+  logout: () => void;
+};
+
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [user, setUserState] = useState<User>(() => getUser());
+  const [token, setTokenState] = useState<string | null>(() => getToken());
+  const qc = useQueryClient();
+
+  useEffect(() => {
+    // when token/user changed in localStorage externally, rehydrate (other tabs)
+    const onStorage = () => {
+      setUserState(getUser());
+      setTokenState(getToken());
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  const setAuth = (u: User, t: string) => {
+    // update local state
+    setUserState(u);
+    setTokenState(t);
+
+    // persist to localStorage (wrapped helpers)
+    try {
+      storageSetUser(u);
+      storageSetToken(t);
+    } catch {
+      /* ignore storage errors */
+    }
+
+    // prime the "me" cache for convenience
+    qc.setQueryData(queryKeys.me, u);
+
+    // invalidate auth-protected lists so they refetch under new user
+    try {
+      qc.invalidateQueries({ queryKey: queryKeys.expenses });
+      qc.invalidateQueries({ queryKey: queryKeys.budgets });
+      qc.invalidateQueries({ queryKey: queryKeys.categories });
+    } catch {
+      // ignore; fail safe
+    }
+  };
+
+  const logout = () => {
+    // clear in-memory state
+    setUserState(null);
+    setTokenState(null);
+
+    // clear storage (helpers)
+    try {
+      removeToken();
+      removeUser();
+      // also double-ensure via localStorage directly in case helpers fail
+      try {
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("auth_user");
+      } catch {}
+    } catch {
+      /* ignore storage errors */
+    }
+
+    // clear query cache so protected data isn't shown accidentally
+    try {
+      qc.clear();
+    } catch {
+      /* ignore */
+    }
+
+    // hard redirect to login so app resets to public state
+    // use window.location.assign to make it clear in logs too
+    window.location.assign(ROUTES.LOGIN);
+  };
+
+  const value = useMemo(
+    () => ({
+      user,
+      token,
+      isAuthenticated: !!token,
+      setAuth,
+      logout,
+    }),
+    [user, token]
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+export const useAuth = () => {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
+  return ctx;
+};

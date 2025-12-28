@@ -1,4 +1,4 @@
-// packages/client/src/pages/register.tsx
+// packages/client/src/pages/auth/register.tsx
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import ROUTES from "@/utils/routes";
@@ -14,20 +14,36 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Wallet } from "lucide-react";
+import { useRegister } from "@/hooks/useRegister";
 
 export default function RegisterPage(): JSX.Element {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const mutation = useRegister();
+  const { mutateAsync, status } = mutation;
+  const isLoading = status === "pending";
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setLoading(true);
+    setFormError(null);
+    const form = new FormData(e.currentTarget);
+    const name = String(form.get("name") || "").trim();
+    const email = String(form.get("email") || "").trim();
+    const password = String(form.get("password") || "");
 
-    // Replace this with your real register API call
-    setTimeout(() => {
-      setLoading(false);
+    if (!name || !email || !password) {
+      setFormError("All fields are required.");
+      return;
+    }
+
+    try {
+      await mutateAsync({ name, email, password });
       navigate(ROUTES.DASHBOARD);
-    }, 1000);
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.message || err?.message || "Registration failed";
+      setFormError(msg);
+    }
   };
 
   return (
@@ -51,6 +67,7 @@ export default function RegisterPage(): JSX.Element {
               <Label htmlFor="name">Full Name</Label>
               <Input
                 id="name"
+                name="name"
                 placeholder="John Doe"
                 required
                 className="bg-background/50"
@@ -61,6 +78,7 @@ export default function RegisterPage(): JSX.Element {
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
+                name="email"
                 type="email"
                 placeholder="name@example.com"
                 required
@@ -72,18 +90,23 @@ export default function RegisterPage(): JSX.Element {
               <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
+                name="password"
                 type="password"
                 required
                 className="bg-background/50"
               />
             </div>
 
+            {formError && (
+              <div className="text-sm text-destructive">{formError}</div>
+            )}
+
             <Button
               type="submit"
               className="w-full rounded-full"
-              disabled={loading}
+              disabled={isLoading}
             >
-              {loading ? "Creating account..." : "Sign Up"}
+              {isLoading ? "Creating account..." : "Sign Up"}
             </Button>
           </form>
         </CardContent>

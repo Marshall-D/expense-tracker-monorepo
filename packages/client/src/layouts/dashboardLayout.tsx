@@ -1,4 +1,5 @@
 // packages/client/src/layouts/dashboardLayout.tsx
+
 import React, { useState } from "react";
 import { NavLink, Link, Outlet } from "react-router-dom";
 import ROUTES from "@/utils/routes";
@@ -13,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/context/authProvider"; // <-- added import
 
 const navItems = [
   { name: "Dashboard", to: ROUTES.DASHBOARD, icon: LayoutDashboard },
@@ -55,6 +57,8 @@ export default function DashboardLayout(): JSX.Element {
   const [open, setOpen] = useState(false);
   const handleNavigate = () => setOpen(false);
 
+  const { user, logout } = useAuth(); // <-- use auth
+
   return (
     <div className="flex min-h-screen bg-background">
       <aside className="w-64 border-r border-border/40 hidden md:flex flex-col sticky top-0 h-screen bg-card/30 backdrop-blur-md">
@@ -74,15 +78,14 @@ export default function DashboardLayout(): JSX.Element {
         </nav>
 
         <div className="p-4 border-t border-border/40">
+          {/* Desktop logout now calls logout() instead of navigating to /login */}
           <Button
             variant="ghost"
             className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive"
-            asChild
+            onClick={() => logout()}
           >
-            <Link to={ROUTES.LOGIN}>
-              <LogOut className="h-4 w-4" />
-              Logout
-            </Link>
+            <LogOut className="h-4 w-4" />
+            Logout
           </Button>
         </div>
       </aside>
@@ -106,30 +109,32 @@ export default function DashboardLayout(): JSX.Element {
 
           <div className="flex items-center gap-4">
             <p className="text-sm text-muted-foreground hidden md:block">
-              Welcome back, John Doe
+              Welcome back, {user?.name ?? "Guest"}
             </p>
 
-            {/* Add Expense -> /dashboard/expenses/new */}
+            {/* Add Expense -> uses route constant (ADD_EXPENSES) */}
             <Button asChild size="sm" className="rounded-full px-4">
               <Link to={ROUTES.EXPENSES_NEW}>Add Expense</Link>
             </Button>
           </div>
         </header>
 
-        {/* off-canvas + main content remain unchanged */}
-        {/* ...rest of file unchanged... */}
+        {/* Off-canvas mobile drawer */}
         <div
           aria-hidden={!open}
           className={`fixed inset-0 z-40 md:hidden transition-opacity ${
             open ? "opacity-100" : "pointer-events-none opacity-0"
           }`}
         >
+          {/* backdrop */}
           <div
             className={`absolute inset-0 bg-black/40 transition-opacity ${
               open ? "opacity-100" : "opacity-0"
             }`}
             onClick={() => setOpen(false)}
           />
+
+          {/* panel */}
           <nav
             className={`absolute left-0 top-0 bottom-0 w-72 bg-card/90 backdrop-blur-md border-r border-border/40 transform transition-transform ${
               open ? "translate-x-0" : "-translate-x-full"
@@ -171,15 +176,17 @@ export default function DashboardLayout(): JSX.Element {
               </div>
 
               <div className="p-4 border-t border-border/40">
+                {/* Mobile logout */}
                 <Button
                   variant="ghost"
                   className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive"
-                  asChild
+                  onClick={() => {
+                    setOpen(false);
+                    logout();
+                  }}
                 >
-                  <Link to={ROUTES.LOGIN} onClick={handleNavigate}>
-                    <LogOut className="h-4 w-4" />
-                    Logout
-                  </Link>
+                  <LogOut className="h-4 w-4" />
+                  Logout
                 </Button>
               </div>
             </div>

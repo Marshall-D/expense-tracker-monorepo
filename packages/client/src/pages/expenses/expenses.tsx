@@ -1,4 +1,5 @@
 // packages/client/src/pages/expenses/expenses.tsx
+
 import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -17,15 +18,30 @@ import { Search, Filter, Plus, Pencil, Trash2, Download } from "lucide-react";
 import ROUTES from "@/utils/routes";
 import { useExpenses, useDeleteExpense } from "@/hooks/useExpenses";
 
+/**
+ * small debounce hook for values (ms)
+ */
+function useDebouncedValue<T>(value: T, delayMs = 300) {
+  const [debounced, setDebounced] = useState<T>(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(t);
+  }, [value, delayMs]);
+  return debounced;
+}
+
 function ExpensesContent() {
   const [searchParams, setSearchParams] = useSearchParams();
   const q = searchParams.get("q") || "";
   const [searchTerm, setSearchTerm] = useState(q);
 
+  // debounce the user input to avoid too many requests
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
+
   // Keep params object stable so react-query keys are deterministic
   const params = useMemo(
-    () => ({ q: searchTerm || undefined, limit: 50 }),
-    [searchTerm]
+    () => ({ q: debouncedSearchTerm || undefined, limit: 50 }),
+    [debouncedSearchTerm]
   );
 
   const { data, isLoading, isError } = useExpenses(params);
@@ -33,20 +49,19 @@ function ExpensesContent() {
   const isDeleting = deleteMutation.status === "pending";
 
   useEffect(() => {
-    // keep searchParam in sync with local state
+    // update URL when debounced value changes so the URL is shareable/bookmarkable
     const paramsObj = new URLSearchParams(searchParams.toString());
-    if (searchTerm) paramsObj.set("q", searchTerm);
+    if (debouncedSearchTerm) paramsObj.set("q", debouncedSearchTerm);
     else paramsObj.delete("q");
     setSearchParams(paramsObj, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm]);
+  }, [debouncedSearchTerm]);
 
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this expense?")) return;
     try {
       await deleteMutation.mutateAsync(id);
     } catch (err) {
-      // error is handled by mutation; optionally show a toast
       console.error("Delete failed", err);
     }
   };

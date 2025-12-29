@@ -1,4 +1,5 @@
 // packages/server/src/handlers/getAllExpenses.ts
+
 import type { APIGatewayProxyHandler } from "aws-lambda";
 import { requireAuth } from "../../lib/requireAuth";
 import { jsonResponse } from "../../lib/validation";
@@ -22,13 +23,16 @@ const getAllExpensesQuerySchema = z.object({
     .refine((s) => !s || !Number.isNaN(Date.parse(s)), {
       message: "invalid to date",
     }),
+  // exact category name match
   category: z.string().min(1).optional(),
+  // categoryId must be a 24 hex char string
   categoryId: z
     .string()
     .optional()
     .refine((s) => !s || /^[0-9a-fA-F]{24}$/.test(s), {
       message: "invalid categoryId",
     }),
+  q: z.string().optional(), // search query (description OR category)
   limit: z
     .union([z.string(), z.number()])
     .optional()
@@ -38,7 +42,6 @@ const getAllExpensesQuerySchema = z.object({
       if (!Number.isFinite(n)) return undefined;
       return Math.max(1, Math.min(100, Math.trunc(n)));
     }),
-
   page: z
     .union([z.string(), z.number()])
     .optional()
@@ -49,6 +52,11 @@ const getAllExpensesQuerySchema = z.object({
       return Math.max(1, Math.trunc(n));
     }),
 });
+
+// Escape user input for safe RegExp use
+function escapeRegex(input: string) {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 const getAllExpensesImpl: APIGatewayProxyHandler = async (event) => {
   if (event.httpMethod === "OPTIONS") return jsonResponse(204, {});
@@ -75,6 +83,7 @@ const getAllExpensesImpl: APIGatewayProxyHandler = async (event) => {
     to,
     category,
     categoryId,
+    q,
     limit: maybeLimit,
     page: maybePage,
   } = parsed.data;
@@ -94,19 +103,40 @@ const getAllExpensesImpl: APIGatewayProxyHandler = async (event) => {
   try {
     const expenses = db.collection("expenses");
 
-    // build query
+    // base filter: only this user's expenses
     const filter: any = { userId: new ObjectId(userId) };
 
+    // category/categoryId exact filters (if provided)
     if (categoryId) {
       filter.categoryId = new ObjectId(categoryId);
     } else if (category) {
       filter.category = category;
     }
 
+    // date range
     if (from || to) {
       filter.date = {};
       if (from) filter.date.$gte = new Date(from);
       if (to) filter.date.$lte = new Date(to);
+    }
+
+    // handle text search (q)
+    if (q && q.trim()) {
+      const term = q.trim();
+      const regex = new RegExp(escapeRegex(term), "i");
+
+      // If category/categoryId provided, we already filter by category; in that case
+      // apply the search to description only (i.e., both category AND description must match)
+      if (category || categoryId) {
+        filter.description = { $regex: regex };
+      } else {
+        // No explicit category filter: search description OR category fields
+        // Combine with existing filter (userId etc.)
+        filter.$or = [
+          { description: { $regex: regex } },
+          { category: { $regex: regex } },
+        ];
+      }
     }
 
     const total = await expenses.countDocuments(filter);

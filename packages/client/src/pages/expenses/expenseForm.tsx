@@ -1,20 +1,16 @@
 // packages/client/src/pages/expenses/ExpenseForm.tsx
-
 import React, { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Expense, ExpenseCreatePayload } from "@/types/expense";
-import type { Category } from "@/types/categories";
+import { useCategories } from "@/hooks/useCategories";
 
 /**
  * ExpenseForm
  * - initial: Partial<Expense> (optional prefill when editing)
  * - onSubmit: emits ExpenseCreatePayload (shape backend expects for create/update)
- *
- * Reason: Expense (full resource) includes server-provided fields (id, userId, category string)
- * while the form should send the create/update payload only.
  */
 type Props = {
   initial?: Partial<Expense>;
@@ -27,26 +23,34 @@ export default function ExpenseForm({
   onSubmit,
   submitLabel = "Save",
 }: Props) {
-  const [categories, setCategories] = useState<Category[]>([]);
   const [amount, setAmount] = useState<string>(
     initial.amount?.toString() ?? ""
   );
   const [currency, setCurrency] = useState(initial.currency ?? "NGN");
   const [description, setDescription] = useState(initial.description ?? "");
-  const [categoryId, setCategoryId] = useState(initial.categoryId ?? "");
+  const [categoryId, setCategoryId] = useState<string>(
+    initial.categoryId ?? ""
+  );
   const [date, setDate] = useState(
     initial.date ?? new Date().toISOString().slice(0, 10)
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // If you want to populate categories in the form, fetch them here.
-  // For now this is a placeholder so the select isn't empty.
+  // useCategories returns { data, isLoading, isError, refetch }
+  const {
+    data: categories = [],
+    isLoading: categoriesLoading,
+    isError: categoriesError,
+    refetch: refetchCategories,
+  } = useCategories(true);
+
   useEffect(() => {
-    // TODO: replace with real categories fetch via hook
-    // setCategories([...])
-    setCategories((prev) => prev);
-  }, []);
+    // if initial.categoryId exists but categories not yet loaded, we keep initial selection
+    if (initial.categoryId) {
+      setCategoryId(initial.categoryId);
+    }
+  }, [initial.categoryId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,12 +60,12 @@ export default function ExpenseForm({
       setError("Enter a valid amount greater than 0");
       return;
     }
-    // categoryId can be optional if you support free-text category. Your earlier form required it;
-    // keep the same validation behavior, but adapt if desired.
+
     if (!categoryId) {
       setError("Please select a category");
       return;
     }
+
     setLoading(true);
     try {
       const payload: ExpenseCreatePayload = {
@@ -74,7 +78,7 @@ export default function ExpenseForm({
       await onSubmit(payload);
     } catch (err: any) {
       setError(err?.message ?? "Failed");
-      throw err; // rethrow so callers can react if they need
+      throw err;
     } finally {
       setLoading(false);
     }
@@ -118,19 +122,40 @@ export default function ExpenseForm({
 
           <div>
             <Label htmlFor="category">Category</Label>
-            <select
-              id="category"
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full h-10 px-3 rounded-md border border-border/20 bg-background/50"
-            >
-              <option value="">-- select category --</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center gap-2">
+              <select
+                id="category"
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                className="w-full h-10 px-3 rounded-md border border-border/20 bg-background/50"
+                disabled={categoriesLoading}
+              >
+                {categoriesLoading ? (
+                  <option value="">Loading categories…</option>
+                ) : categoriesError ? (
+                  <option value="">Failed to load categories</option>
+                ) : (
+                  <>
+                    <option value="">-- select category --</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </>
+                )}
+              </select>
+
+              {categoriesError && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => refetchCategories()}
+                >
+                  Retry
+                </Button>
+              )}
+            </div>
           </div>
 
           <div>
@@ -158,7 +183,11 @@ export default function ExpenseForm({
           {error && <div className="text-sm text-destructive">{error}</div>}
 
           <div className="flex gap-2">
-            <Button type="submit" className="rounded-full" disabled={loading}>
+            <Button
+              type="submit"
+              className="rounded-full"
+              disabled={loading || categoriesLoading}
+            >
               {loading ? "Saving..." : submitLabel}
             </Button>
           </div>

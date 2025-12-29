@@ -1,6 +1,5 @@
 // packages/client/src/layouts/dashboardLayout.tsx
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { NavLink, Link, Outlet } from "react-router-dom";
 import ROUTES from "@/utils/routes";
 import {
@@ -14,7 +13,10 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/context/authProvider"; // <-- added import
+import { useAuth } from "@/context/authProvider";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/queryKeys";
+import * as categoryService from "@/services/categoryService"; // used for prefetch
 
 const navItems = [
   { name: "Dashboard", to: ROUTES.DASHBOARD, icon: LayoutDashboard },
@@ -57,7 +59,18 @@ export default function DashboardLayout(): JSX.Element {
   const [open, setOpen] = useState(false);
   const handleNavigate = () => setOpen(false);
 
-  const { user, logout } = useAuth(); // <-- use auth
+  const { user, logout } = useAuth();
+  const qc = useQueryClient();
+
+  // Prefetch categories once when layout mounts (so Add form is instant)
+  useEffect(() => {
+    qc.prefetchQuery({
+      queryKey: [queryKeys.categories, { includeGlobal: true }],
+      queryFn: () => categoryService.fetchCategories(true),
+    }).catch(() => {});
+    // run on mount only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -78,7 +91,6 @@ export default function DashboardLayout(): JSX.Element {
         </nav>
 
         <div className="p-4 border-t border-border/40">
-          {/* Desktop logout now calls logout() instead of navigating to /login */}
           <Button
             variant="ghost"
             className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive"
@@ -112,9 +124,19 @@ export default function DashboardLayout(): JSX.Element {
               Welcome back, {user?.name ?? "Guest"}
             </p>
 
-            {/* Add Expense -> uses route constant (ADD_EXPENSES) */}
+            {/* Add Expense -> prefetch categories on hover for extra speed */}
             <Button asChild size="sm" className="rounded-full px-4">
-              <Link to={ROUTES.EXPENSES_NEW}>Add Expense</Link>
+              <Link
+                to={ROUTES.EXPENSES_NEW}
+                onMouseEnter={() =>
+                  qc.prefetchQuery({
+                    queryKey: [queryKeys.categories, { includeGlobal: true }],
+                    queryFn: () => categoryService.fetchCategories(true),
+                  })
+                }
+              >
+                Add Expense
+              </Link>
             </Button>
           </div>
         </header>

@@ -1,138 +1,76 @@
 // packages/client/src/pages/expenses/ExpenseEditorPage.tsx
-
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import ROUTES from "@/utils/routes";
-import type { Expense, ExpenseCreatePayload } from "@/types/expense";
+import type { ExpenseCreatePayload, Expense } from "@/types/expense";
 import { Button } from "@/components/ui/button";
 import ExpenseForm from "./expenseForm";
-
-/**
- * ExpenseEditorPage
- * - uses ExpenseForm which emits ExpenseCreatePayload
- * - when editing (id present) we call update flow (simulated here)
- * - when creating (no id) we call create flow (simulated here)
- *
- * NOTE: Replace the simulated API calls with real service hooks (e.g. useCreateExpense / useUpdateExpense)
- * when wiring to the backend.
- */
-
-const DUMMY_EXPENSES: Record<string, Expense> = {
-  "1": {
-    id: "1",
-    userId: "user-abc",
-    amount: 2500,
-    currency: "NGN",
-    description: "Weekly Groceries",
-    category: "Food",
-    categoryId: "1",
-    date: "2025-12-24",
-    createdAt: "2025-12-24T12:00:00.000Z",
-  },
-  "2": {
-    id: "2",
-    userId: "user-abc",
-    amount: 45.99,
-    currency: "USD",
-    description: "Movie Tickets",
-    category: "Entertainment",
-    categoryId: "3",
-    date: "2025-12-23",
-    createdAt: "2025-12-23T10:00:00.000Z",
-  },
-};
+import {
+  useCreateExpense,
+  useExpense,
+  useUpdateExpense,
+  useDeleteExpense,
+} from "@/hooks/useExpenses";
 
 export default function ExpenseEditorPage(): JSX.Element {
   const { id } = useParams();
   const isNew = !id;
   const navigate = useNavigate();
 
-  const [initial, setInitial] = useState<Partial<Expense> | undefined>(
-    undefined
-  );
-  const [loading, setLoading] = useState<boolean>(!!id);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  // data hooks
+  const expenseQuery = useExpense(id);
+  const createMutation = useCreateExpense();
+  const updateMutation = useUpdateExpense();
+  const deleteMutation = useDeleteExpense();
+
   const [error, setError] = useState<string | null>(null);
+  const loading = isNew ? false : expenseQuery.isLoading;
+
+  // derive booleans using status (type-safe)
+  const isCreating = createMutation.status === "pending";
+  const isUpdating = updateMutation.status === "pending";
+  const isDeleting = deleteMutation.status === "pending";
+
+  // map fetched expense to initial form shape (Partial<Expense>)
+  const initial = useMemo<Partial<Expense> | undefined>(() => {
+    if (!expenseQuery.data) return undefined;
+    const e = expenseQuery.data;
+    return { ...e, date: e.date ? e.date.slice(0, 10) : undefined };
+  }, [expenseQuery.data]);
 
   useEffect(() => {
-    if (!id) {
-      setInitial(undefined);
-      setLoading(false);
-      return;
+    if (!isNew && expenseQuery.isError) {
+      setError("Failed to load expense.");
     }
+  }, [isNew, expenseQuery.isError]);
 
-    setLoading(true);
-    const t = setTimeout(() => {
-      const found = DUMMY_EXPENSES[id];
-      if (found) {
-        // ensure date is yyyy-mm-dd for the form
-        setInitial({ ...found, date: found.date?.slice(0, 10) });
-      } else {
-        setError("Expense not found (dummy).");
-      }
-      setLoading(false);
-    }, 400);
-
-    return () => clearTimeout(t);
-  }, [id]);
-
-  // handleSubmit now accepts ExpenseCreatePayload (form emits this)
   const handleSubmit = async (payload: ExpenseCreatePayload) => {
     setError(null);
-    setSaving(true);
-
-    // simulate API call latency
-    await new Promise((r) => setTimeout(r, 600));
-
-    if (isNew) {
-      // simulate backend returning new id
-      const newId = String(Date.now());
-      // In a real app you'd call createExpense(payload) and use response.id
-      DUMMY_EXPENSES[newId] = {
-        id: newId,
-        userId: "user-abc",
-        amount: payload.amount,
-        currency: payload.currency ?? "NGN",
-        description: payload.description ?? "",
-        category: payload.category ?? "Uncategorized",
-        categoryId: payload.categoryId ?? null,
-        date: payload.date ?? new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-      };
-    } else {
-      // update path (id exists)
-      if (id && DUMMY_EXPENSES[id]) {
-        DUMMY_EXPENSES[id] = {
-          ...DUMMY_EXPENSES[id],
-          amount: payload.amount,
-          currency: payload.currency ?? DUMMY_EXPENSES[id].currency,
-          description: payload.description ?? DUMMY_EXPENSES[id].description,
-          categoryId: payload.categoryId ?? DUMMY_EXPENSES[id].categoryId,
-          // optionally update category string if you resolve it
-          date: payload.date ?? DUMMY_EXPENSES[id].date,
-        };
+    try {
+      if (isNew) {
+        await createMutation.mutateAsync(payload);
+        // optimistic updates handled in hook; navigate to list
+        navigate(ROUTES.EXPENSES);
       } else {
-        setError("Unable to update: item not found.");
-        setSaving(false);
-        return;
+        if (!id) throw new Error("Missing id");
+        await updateMutation.mutateAsync({ id, payload });
+        navigate(ROUTES.EXPENSES);
       }
+    } catch (err: any) {
+      setError(err?.message ?? "Save failed");
     }
-
-    setSaving(false);
-    // navigate back to list (in real app you'd check response)
-    navigate(ROUTES.EXPENSES);
   };
 
   const handleDelete = async () => {
     if (!id) return;
     if (!confirm("Delete this expense? This action cannot be undone.")) return;
-    setDeleting(true);
-    await new Promise((r) => setTimeout(r, 600));
-    // simulate delete
-    delete DUMMY_EXPENSES[id];
-    setDeleting(false);
-    navigate(ROUTES.EXPENSES);
+    setError(null);
+    try {
+      await deleteMutation.mutateAsync(id);
+      navigate(ROUTES.EXPENSES);
+    } catch (err: any) {
+      setError(err?.message ?? "Delete failed");
+    }
   };
 
   if (loading) return <div>Loading expense…</div>;
@@ -164,9 +102,9 @@ export default function ExpenseEditorPage(): JSX.Element {
               variant="destructive"
               size="sm"
               onClick={handleDelete}
-              disabled={deleting}
+              disabled={isDeleting}
             >
-              {deleting ? "Deleting…" : "Delete"}
+              {isDeleting ? "Deleting…" : "Delete"}
             </Button>
           </div>
         )}

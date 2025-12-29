@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import CategoryForm from "./categoryForm";
 import ROUTES from "@/utils/routes";
-import type { Category } from "@/types";
+import type { Category } from "@/types/categories";
 import { Button } from "@/components/ui/button";
 
 const DUMMY_CATEGORIES: Record<string, Category> = {

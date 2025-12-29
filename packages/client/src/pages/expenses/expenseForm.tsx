@@ -1,14 +1,24 @@
 // packages/client/src/pages/expenses/ExpenseForm.tsx
+
 import React, { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { Category, Expense } from "@/types";
+import type { Expense, ExpenseCreatePayload } from "@/types/expense";
+import type { Category } from "@/types/categories";
 
+/**
+ * ExpenseForm
+ * - initial: Partial<Expense> (optional prefill when editing)
+ * - onSubmit: emits ExpenseCreatePayload (shape backend expects for create/update)
+ *
+ * Reason: Expense (full resource) includes server-provided fields (id, userId, category string)
+ * while the form should send the create/update payload only.
+ */
 type Props = {
   initial?: Partial<Expense>;
-  onSubmit: (payload: Expense) => Promise<void>;
+  onSubmit: (payload: ExpenseCreatePayload) => Promise<void>;
   submitLabel?: string;
 };
 
@@ -30,6 +40,14 @@ export default function ExpenseForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // If you want to populate categories in the form, fetch them here.
+  // For now this is a placeholder so the select isn't empty.
+  useEffect(() => {
+    // TODO: replace with real categories fetch via hook
+    // setCategories([...])
+    setCategories((prev) => prev);
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -38,21 +56,25 @@ export default function ExpenseForm({
       setError("Enter a valid amount greater than 0");
       return;
     }
+    // categoryId can be optional if you support free-text category. Your earlier form required it;
+    // keep the same validation behavior, but adapt if desired.
     if (!categoryId) {
       setError("Please select a category");
       return;
     }
     setLoading(true);
     try {
-      await onSubmit({
+      const payload: ExpenseCreatePayload = {
         amount: parsed,
         currency,
         description,
         categoryId,
         date,
-      });
+      };
+      await onSubmit(payload);
     } catch (err: any) {
       setError(err?.message ?? "Failed");
+      throw err; // rethrow so callers can react if they need
     } finally {
       setLoading(false);
     }

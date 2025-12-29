@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import BudgetForm from "./budgetForm";
 import ROUTES from "@/utils/routes";
-import type { Budget } from "@/types";
+import type { Budget } from "@/types/budget";
 import { Button } from "@/components/ui/button";
 
 const DUMMY_BUDGETS: Record<string, Budget> = {

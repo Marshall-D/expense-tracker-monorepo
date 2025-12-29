@@ -1,3 +1,5 @@
+// packages/client/src/lib/queryKeys.ts
+
 export const queryKeys = {
   me: ["me"] as const,
   expenses: ["expenses"] as const,

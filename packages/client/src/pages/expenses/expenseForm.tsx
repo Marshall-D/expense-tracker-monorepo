@@ -1,5 +1,5 @@
 // packages/client/src/pages/expenses/ExpenseForm.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -7,11 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Expense, ExpenseCreatePayload } from "@/types/expense";
 import { useCategories } from "@/hooks/useCategories";
 
-/**
- * ExpenseForm
- * - initial: Partial<Expense> (optional prefill when editing)
- * - onSubmit: emits ExpenseCreatePayload (shape backend expects for create/update)
- */
 type Props = {
   initial?: Partial<Expense>;
   onSubmit: (payload: ExpenseCreatePayload) => Promise<void>;
@@ -23,6 +18,8 @@ export default function ExpenseForm({
   onSubmit,
   submitLabel = "Save",
 }: Props) {
+  const touchedRef = useRef(false);
+
   const [amount, setAmount] = useState<string>(
     initial.amount?.toString() ?? ""
   );
@@ -37,7 +34,6 @@ export default function ExpenseForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // useCategories returns { data, isLoading, isError, refetch }
   const {
     data: categories = [],
     isLoading: categoriesLoading,
@@ -45,12 +41,43 @@ export default function ExpenseForm({
     refetch: refetchCategories,
   } = useCategories(true);
 
+  // Sync local state when `initial` prop changes, but only if user hasn't interacted yet.
   useEffect(() => {
-    // if initial.categoryId exists but categories not yet loaded, we keep initial selection
-    if (initial.categoryId) {
-      setCategoryId(initial.categoryId);
+    if (!initial || Object.keys(initial).length === 0) {
+      return;
     }
-  }, [initial.categoryId]);
+    if (touchedRef.current) {
+      return;
+    }
+
+    setAmount(initial.amount?.toString() ?? "");
+    setCurrency(initial.currency ?? "NGN");
+    setDescription(initial.description ?? "");
+    setCategoryId(initial.categoryId ?? "");
+    setDate(initial.date ?? new Date().toISOString().slice(0, 10));
+  }, [initial]);
+
+  // mark touched when user changes each field
+  const onAmountChange = (val: string) => {
+    touchedRef.current = true;
+    setAmount(val);
+  };
+  const onCurrencyChange = (val: string) => {
+    touchedRef.current = true;
+    setCurrency(val);
+  };
+  const onDescriptionChange = (val: string) => {
+    touchedRef.current = true;
+    setDescription(val);
+  };
+  const onCategoryChange = (val: string) => {
+    touchedRef.current = true;
+    setCategoryId(val);
+  };
+  const onDateChange = (val: string) => {
+    touchedRef.current = true;
+    setDate(val);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,7 +125,7 @@ export default function ExpenseForm({
                 id="amount"
                 inputMode="decimal"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e) => onAmountChange(e.target.value)}
                 required
                 className="bg-background/50"
                 placeholder="0.00"
@@ -110,7 +137,7 @@ export default function ExpenseForm({
               <select
                 id="currency"
                 value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
+                onChange={(e) => onCurrencyChange(e.target.value)}
                 className="w-full h-10 px-3 rounded-md border border-border/20 bg-background/50"
               >
                 <option value="NGN">NGN</option>
@@ -126,7 +153,7 @@ export default function ExpenseForm({
               <select
                 id="category"
                 value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
+                onChange={(e) => onCategoryChange(e.target.value)}
                 className="w-full h-10 px-3 rounded-md border border-border/20 bg-background/50"
                 disabled={categoriesLoading}
               >
@@ -163,7 +190,7 @@ export default function ExpenseForm({
             <textarea
               id="description"
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(e) => onDescriptionChange(e.target.value)}
               rows={3}
               className="w-full rounded-md border border-border/20 bg-background/50 p-2"
               placeholder="e.g. Weekly groceries"
@@ -176,7 +203,7 @@ export default function ExpenseForm({
               id="date"
               type="date"
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={(e) => onDateChange(e.target.value)}
             />
           </div>
 

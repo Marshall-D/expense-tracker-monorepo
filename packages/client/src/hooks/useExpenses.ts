@@ -33,7 +33,11 @@ export const useExpense = (id?: string) =>
   useQuery<Expense>({
     queryKey: id ? [queryKeys.expense, id] : [queryKeys.expense, "empty"],
     enabled: Boolean(id),
-    queryFn: () => (id ? expensesService.getExpense(id) : Promise.reject()),
+    queryFn: ({ queryKey }) => {
+      const maybeId = queryKey[1] as string | undefined;
+      if (!maybeId) return Promise.reject(new Error("Missing id"));
+      return expensesService.getExpense(maybeId);
+    },
     staleTime: 1000 * 30,
   });
 

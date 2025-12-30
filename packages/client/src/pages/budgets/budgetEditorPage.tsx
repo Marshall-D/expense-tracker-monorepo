@@ -7,8 +7,8 @@ import type { Budget } from "@/types/budget";
 import { Button } from "@/components/ui/button";
 
 const DUMMY_BUDGETS: Record<string, Budget> = {
-  a: { id: "a", categoryId: "1", amount: 50000, currency: "NGN" },
-  b: { id: "b", categoryId: "2", amount: 15000, currency: "NGN" },
+  a: { id: "a", categoryId: "1", amount: 50000 },
+  b: { id: "b", categoryId: "2", amount: 15000 },
 };
 
 export default function BudgetEditorPage(): JSX.Element {

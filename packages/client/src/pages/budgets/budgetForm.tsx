@@ -20,7 +20,6 @@ export default function BudgetForm({
   const [categories, setCategories] = useState<any[]>([]);
   const [categoryId, setCategoryId] = useState(initial.categoryId ?? "");
   const [amount, setAmount] = useState(initial.amount?.toString() ?? "");
-  const [currency, setCurrency] = useState(initial.currency ?? "NGN");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,7 +31,7 @@ export default function BudgetForm({
     if (!parsed || parsed <= 0) return setError("Enter a valid amount");
     setLoading(true);
     try {
-      await onSubmit({ amount: parsed, categoryId, currency });
+      await onSubmit({ amount: parsed, categoryId });
     } catch (err: any) {
       setError(err?.message ?? "Failed");
     } finally {
@@ -73,19 +72,6 @@ export default function BudgetForm({
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
               />
-            </div>
-
-            <div>
-              <Label htmlFor="currency">Currency</Label>
-              <select
-                id="currency"
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-                className="w-full h-10 rounded-md"
-              >
-                <option value="NGN">NGN</option>
-                <option value="USD">USD</option>
-              </select>
             </div>
           </div>
 

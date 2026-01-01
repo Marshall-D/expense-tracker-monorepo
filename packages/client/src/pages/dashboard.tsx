@@ -1,6 +1,5 @@
 // packages/client/src/pages/dashboard.tsx
-
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -33,61 +32,95 @@ import { useExpenses } from "@/hooks/useExpenses";
 import { useCategories } from "@/hooks/useCategories";
 import { format } from "date-fns";
 
-/**
- * Dashboard page now wired to real data:
- * - trends: useTrends(6)
- * - category distribution: useCategoryReport for the current month
- * - transactions: useExpenses for current month
- *
- * Notes:
- * - The app supports multiple currencies (USD/NGN). At the moment category totals are
- *   combined numerically (totalUSD + totalNGN). This is functional for charts but not
- *   currency-accurate. If you want normalized currency (preferred for finance apps)
- *   we'll need an exchange-rate normalization step server- or client-side.
- */
+function monthLabel(isoMonth: string | null) {
+  if (!isoMonth) return "—";
+  try {
+    const [y, m] = isoMonth.split("-");
+    const d = new Date(Number(y), Number(m) - 1, 1);
+    return format(d, "MMM yyyy");
+  } catch {
+    return String(isoMonth);
+  }
+}
 
-function monthLabel(isoMonth: string) {
+function monthShort(isoMonth: string | null) {
+  if (!isoMonth) return "—";
   try {
     const [y, m] = isoMonth.split("-");
     const d = new Date(Number(y), Number(m) - 1, 1);
     return format(d, "MMM");
   } catch {
-    return isoMonth;
+    return String(isoMonth);
   }
 }
 
 function formatNumber(n: number | undefined) {
   if (!n && n !== 0) return "—";
-  return new Intl.NumberFormat("en-US", {
+  return `₦${new Intl.NumberFormat("en-NG", {
     maximumFractionDigits: 0,
-  }).format(n);
+  }).format(n)}`;
+}
+
+function monthToRange(isoMonth: string) {
+  const [y, m] = isoMonth.split("-");
+  const year = Number(y);
+  const month = Number(m) - 1;
+  const start = new Date(Date.UTC(year, month, 1, 0, 0, 0));
+  const end = new Date(Date.UTC(year, month + 1, 0, 0, 0, 0));
+  return [format(start, "yyyy-MM-dd"), format(end, "yyyy-MM-dd")];
 }
 
 export default function DashboardPage() {
   const monthsAgo = 6;
 
-  // trends for last N months
+  // trends for last N months (NGN-only)
   const { data: trendsData, isLoading: trendsLoading } = useTrends(monthsAgo);
 
-  // derive current month start/end in yyyy-MM-dd (UTC-style for consistency)
-  const now = new Date();
-  const currentYear = now.getUTCFullYear();
-  const currentMonth = now.getUTCMonth(); // 0-indexed
-  const monthStart = new Date(Date.UTC(currentYear, currentMonth, 1, 0, 0, 0));
-  const monthEndDate = new Date(
-    Date.UTC(currentYear, currentMonth + 1, 0, 0, 0, 0)
-  ); // last day of month
-  const monthStartStr = format(monthStart, "yyyy-MM-dd");
-  const monthEndStr = format(monthEndDate, "yyyy-MM-dd");
+  // build a list of available months from trends (ordered oldest -> newest)
+  const availableMonths = useMemo(() => {
+    const months = trendsData?.months?.map((m) => m.month) ?? [];
+    return months;
+  }, [trendsData]);
 
-  // trends chart data: combine currencies numerically (note: currency normalization not applied)
+  // Determine current month as fallback (YYYY-MM)
+  const now = new Date();
+  const currentIsoMonth = `${now.getUTCFullYear()}-${String(
+    now.getUTCMonth() + 1
+  ).padStart(2, "0")}`;
+
+  // selectedMonth stores "YYYY-MM"
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+
+  // initialize selectedMonth when trendsData arrives (pick latest month)
+  useEffect(() => {
+    if (!selectedMonth) {
+      const latest =
+        trendsData?.months && trendsData.months.length
+          ? trendsData.months[trendsData.months.length - 1].month
+          : currentIsoMonth;
+      setSelectedMonth(latest);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trendsData]);
+
+  // If trends not available, ensure at least current month appears in selector
+  const selectorMonths =
+    availableMonths && availableMonths.length > 0
+      ? availableMonths
+      : [currentIsoMonth];
+
+  // Compute start/end strings for the selected month; fall back to current month if null
+  const selMonth = selectedMonth ?? currentIsoMonth;
+  const [monthStartStr, monthEndStr] = monthToRange(selMonth);
+
+  // trends chart data: use NGN totals only
   const monthlyData =
     trendsData?.months?.map((m) => ({
       month: monthLabel(m.month),
-      amount: (m.totalNGN ?? 0) + (m.totalUSD ?? 0),
+      amount: m.totalNGN ?? 0,
     })) ?? [];
 
-  // category distribution for current month
+  // category distribution for selected month (NGN-only)
   const { data: categoryResp, isLoading: categoryLoading } = useCategoryReport(
     monthStartStr,
     monthEndStr
@@ -105,7 +138,7 @@ export default function DashboardPage() {
 
   const categoryData =
     categoryResp?.byCategory?.map((r, i) => {
-      const total = (r.totalNGN ?? 0) + (r.totalUSD ?? 0);
+      const total = r.totalNGN ?? 0;
       const color =
         categoryNameToColor.get(r.category) || `var(--chart-${(i % 8) + 1})`;
       return {
@@ -115,7 +148,7 @@ export default function DashboardPage() {
       };
     }) ?? [];
 
-  // transactions for current month (for count)
+  // transactions for selected month (for count)
   const { data: expensesResp, isLoading: expensesLoading } = useExpenses({
     from: monthStartStr,
     to: monthEndStr,
@@ -123,7 +156,7 @@ export default function DashboardPage() {
     page: 1,
   });
 
-  // compute some summary numbers
+  // compute some summary numbers (NGN-only)
   const totalLastNMonths = monthlyData.reduce((s, x) => s + (x.amount ?? 0), 0);
   const lastMonthAmount = monthlyData.length
     ? monthlyData[monthlyData.length - 1].amount
@@ -131,7 +164,7 @@ export default function DashboardPage() {
   const prevMonthAmount =
     monthlyData.length > 1 ? monthlyData[monthlyData.length - 2].amount : 0;
 
-  // percent change between previous and last month (for "savings rate" card we show change)
+  // percent change between previous and last month
   const percentChange =
     prevMonthAmount === 0
       ? 0
@@ -144,6 +177,10 @@ export default function DashboardPage() {
 
   // loading state
   const anyLoading = trendsLoading || categoryLoading || expensesLoading;
+
+  // tooltip formatter (NGN)
+  const ngnFormatter = (value: any) =>
+    value == null ? "—" : `₦${new Intl.NumberFormat("en-NG").format(value)}`;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -175,7 +212,7 @@ export default function DashboardPage() {
                   : `${percentChange}%`}{" "}
                 <ArrowUpRight className="h-3 w-3" />
               </span>{" "}
-              aggregated across currencies
+              totals for the last {monthsAgo} months
             </p>
           </CardContent>
         </Card>
@@ -279,6 +316,7 @@ export default function DashboardPage() {
                     tick={{ fill: "oklch(0.7 0.01 260)", fontSize: 12 }}
                   />
                   <Tooltip
+                    formatter={(value) => ngnFormatter(value)}
                     contentStyle={{
                       backgroundColor: "oklch(0.22 0.02 260)",
                       border: "1px solid rgba(255,255,255,0.1)",
@@ -302,13 +340,36 @@ export default function DashboardPage() {
         </Card>
 
         <Card className="col-span-3 border-border/40 bg-card/40">
-          <CardHeader>
-            <CardTitle>Category Distribution</CardTitle>
-            <CardDescription>
-              Spending by category for {monthStartStr}
-            </CardDescription>
+          <CardHeader className="flex items-start justify-between gap-4">
+            <div>
+              <CardTitle>Category Distribution</CardTitle>
+              <CardDescription>
+                Spending by category for{" "}
+                <span className="font-medium">
+                  {monthLabel(selectedMonth ?? currentIsoMonth)}
+                </span>
+              </CardDescription>
+            </div>
+
+            {/* Month selector */}
+            <div className="ml-auto">
+              <select
+                aria-label="Select month"
+                value={selectedMonth ?? currentIsoMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="h-9 rounded-md border border-border/20 bg-background/60 px-2 text-sm"
+              >
+                {selectorMonths.map((m) => (
+                  <option key={m} value={m}>
+                    {monthShort(m)}
+                  </option>
+                ))}
+              </select>
+            </div>
           </CardHeader>
-          <CardContent className="h-[300px]">
+
+          {/* Chart + Legend container */}
+          <CardContent>
             {categoryLoading ? (
               <div className="p-6">Loading categories…</div>
             ) : categoryData.length === 0 ? (
@@ -316,55 +377,68 @@ export default function DashboardPage() {
                 No category data for this month.
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={categoryData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {categoryData.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={entry.color}
-                        stroke="none"
+              <div className="flex flex-col">
+                {/* fixed-height chart container so legend is always below */}
+                <div className="h-[220px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={categoryData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={56}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {categoryData.map((entry, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={entry.color}
+                            stroke="none"
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(value) => ngnFormatter(value)}
+                        contentStyle={{
+                          backgroundColor: "oklch(0.22 0.02 260)",
+                          border: "1px solid rgba(255,255,255,0.1)",
+                          borderRadius: "12px",
+                        }}
                       />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "oklch(0.22 0.02 260)",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      borderRadius: "12px",
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            )}
-
-            <div className="grid grid-cols-2 gap-2 mt-4 px-4">
-              {categoryData.map((item) => (
-                <div key={item.name} className="flex items-center gap-2">
-                  <div
-                    className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: item.color }}
-                  />
-                  <span className="text-xs text-muted-foreground">
-                    {item.name}
-                  </span>
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
-              ))}
-            </div>
 
-            <div className="mt-3 text-xs text-muted-foreground px-4">
-              Note: category totals shown are raw numeric sums (NGN + USD). If
-              you want currency-normalized values, we should add an
-              exchange-rate step (server or client side).
-            </div>
+                {/* legend always outside the chart, consistent placement */}
+                <div className="mt-4 px-4">
+                  <div className="max-h-36 overflow-auto">
+                    <div className="grid grid-cols-1 gap-2">
+                      {categoryData.map((item) => (
+                        <div
+                          key={item.name}
+                          className="flex items-center justify-between gap-4"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: item.color }}
+                            />
+                            <div className="text-sm text-muted-foreground">
+                              {item.name}
+                            </div>
+                          </div>
+                          <div className="text-sm font-medium">
+                            {ngnFormatter(item.value)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

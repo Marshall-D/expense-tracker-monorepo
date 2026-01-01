@@ -1,5 +1,4 @@
 // packages/client/src/pages/expenses/expenses.tsx
-
 import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -109,6 +108,7 @@ function ExpensesContent() {
     .filter(Boolean);
   const initialFrom = searchParams.get("from") || "";
   const initialTo = searchParams.get("to") || "";
+  const initialPage = Number(searchParams.get("page") || "1");
 
   // search
   const [searchTerm, setSearchTerm] = useState(initialQ);
@@ -139,11 +139,25 @@ function ExpensesContent() {
     initialTo || undefined
   );
 
+  // pagination state
+  const [page, setPage] = useState<number>(initialPage || 1);
+  const limit = 50; // fixed page size for UI; backend caps at 100
+
   // keep searchTerm in sync if URL changed externally
   useEffect(() => {
     setSearchTerm(initialQ);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Reset page to 1 whenever filters/search change
+  useEffect(() => {
+    setPage(1);
+  }, [
+    appliedCategoryIds.join(","),
+    appliedFrom,
+    appliedTo,
+    debouncedSearchTerm,
+  ]);
 
   // date validation
   const dateRangeInvalid =
@@ -155,19 +169,20 @@ function ExpensesContent() {
       q: debouncedSearchTerm || undefined,
       from: appliedFrom || undefined,
       to: appliedTo || undefined,
-      limit: 50,
+      limit,
+      page,
     };
     if (appliedCategoryIds && appliedCategoryIds.length > 0) {
       p.categoryIds = appliedCategoryIds.join(",");
     }
     return p;
-  }, [debouncedSearchTerm, appliedFrom, appliedTo, appliedCategoryIds]);
+  }, [debouncedSearchTerm, appliedFrom, appliedTo, appliedCategoryIds, page]);
 
-  const { data, isLoading, isError } = useExpenses(params);
+  const { data, isLoading, isError, isFetching } = useExpenses(params);
   const deleteMutation = useDeleteExpense();
   const isDeleting = deleteMutation.status === "pending";
 
-  // push applied filters + q into URL (shareable)
+  // push applied filters + q + page into URL (shareable)
   useEffect(() => {
     const qs = new URLSearchParams();
     if (debouncedSearchTerm) qs.set("q", debouncedSearchTerm);
@@ -175,9 +190,10 @@ function ExpensesContent() {
       qs.set("categoryIds", appliedCategoryIds.join(","));
     if (appliedFrom) qs.set("from", appliedFrom);
     if (appliedTo) qs.set("to", appliedTo);
+    if (page && page > 1) qs.set("page", String(page));
     setSearchParams(qs, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearchTerm, appliedCategoryIds, appliedFrom, appliedTo]);
+  }, [debouncedSearchTerm, appliedCategoryIds, appliedFrom, appliedTo, page]);
 
   // helpers
   const toggleCategory = (id: string) =>
@@ -384,6 +400,15 @@ function ExpensesContent() {
     </div>
   );
 
+  // Helpers for result summary & pagination controls
+  const total = data?.total ?? 0;
+  const currentPage = data?.page ?? page;
+  const currentLimit = data?.limit ?? limit;
+  const startIndex = total === 0 ? 0 : (currentPage - 1) * currentLimit + 1;
+  const endIndex = total === 0 ? 0 : startIndex + (data?.data?.length ?? 0) - 1;
+  const hasPrev = currentPage > 1;
+  const hasNext = endIndex < total;
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* HEADER: Title & actions */}
@@ -466,93 +491,144 @@ function ExpensesContent() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div className="text-sm text-muted-foreground">
-                  Showing results
+                  {/* Real results summary */}
+                  {isLoading || isFetching ? (
+                    <span>Loading results…</span>
+                  ) : total === 0 ? (
+                    <span>No expenses yet.</span>
+                  ) : (
+                    <span>
+                      Showing {startIndex}–{endIndex} of {total}
+                    </span>
+                  )}
+                </div>
+
+                {/* small pager info (desktop only) */}
+                <div className="flex items-center gap-2">
+                  <div className="text-xs text-muted-foreground">
+                    Page {currentPage}
+                  </div>
                 </div>
               </div>
             </CardHeader>
 
             <CardContent>
               <div className="rounded-xl border border-border/40 overflow-hidden">
-                {isLoading ? (
+                {isLoading && !data ? (
                   <div className="p-6 text-center">Loading expenses…</div>
                 ) : isError ? (
                   <div className="p-6 text-center text-destructive">
                     Failed to load expenses.
                   </div>
                 ) : (
-                  <Table>
-                    <TableHeader className="bg-muted/50">
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
-                        <TableHead className="w-[100px]"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {data && data.data.length > 0 ? (
-                        data.data.map((expense) => (
-                          <TableRow
-                            key={expense.id}
-                            className="hover:bg-accent/5 transition-colors"
-                          >
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                              {expense.date
-                                ? new Date(expense.date).toLocaleDateString()
-                                : ""}
-                            </TableCell>
-                            <TableCell className="font-medium">
-                              {expense.description}
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant="secondary"
-                                className="bg-primary/10 text-primary hover:bg-primary/20 border-none px-3 rounded-full font-medium"
-                              >
-                                {expense.category ?? "—"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right font-bold font-mono">
-                              {expense.currency === "USD" ? "$" : "₦"}
-                              {expense.amount.toLocaleString()}
-                            </TableCell>
-
-                            <TableCell>
-                              <div className="flex justify-end gap-1">
-                                <Button
-                                  asChild
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 hover:text-primary"
+                  <>
+                    <Table>
+                      <TableHeader className="bg-muted/50">
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Description</TableHead>
+                          <TableHead>Category</TableHead>
+                          <TableHead className="text-right">Amount</TableHead>
+                          <TableHead className="w-[100px]"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {data && data.data.length > 0 ? (
+                          data.data.map((expense) => (
+                            <TableRow
+                              key={expense.id}
+                              className="hover:bg-accent/5 transition-colors"
+                            >
+                              <TableCell className="text-sm font-medium text-muted-foreground">
+                                {expense.date
+                                  ? new Date(expense.date).toLocaleDateString()
+                                  : ""}
+                              </TableCell>
+                              <TableCell className="font-medium">
+                                {expense.description}
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant="secondary"
+                                  className="bg-primary/10 text-primary hover:bg-primary/20 border-none px-3 rounded-full font-medium"
                                 >
-                                  <Link to={ROUTES.EXPENSES_BY_ID(expense.id)}>
-                                    <Pencil className="h-4 w-4" />
-                                  </Link>
-                                </Button>
+                                  {expense.category ?? "—"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right font-bold font-mono">
+                                {expense.currency === "USD" ? "$" : "₦"}
+                                {expense.amount.toLocaleString()}
+                              </TableCell>
 
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 hover:text-destructive"
-                                  onClick={() => handleDelete(expense.id)}
-                                  disabled={isDeleting}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
+                              <TableCell>
+                                <div className="flex justify-end gap-1">
+                                  <Button
+                                    asChild
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 hover:text-primary"
+                                  >
+                                    <Link
+                                      to={ROUTES.EXPENSES_BY_ID(expense.id)}
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Link>
+                                  </Button>
+
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 hover:text-destructive"
+                                    onClick={() => handleDelete(expense.id)}
+                                    disabled={isDeleting}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center p-6">
+                              No expenses yet.
                             </TableCell>
                           </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center p-6">
-                            No expenses yet.
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
+                        )}
+                      </TableBody>
+                    </Table>
+
+                    {/* Pagination controls */}
+                    <div className="p-4 flex items-center justify-between border-t border-border/30 bg-muted/5">
+                      <div className="text-xs text-muted-foreground">
+                        {total === 0
+                          ? ""
+                          : `Showing ${startIndex}–${endIndex} of ${total}`}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setPage((p) => Math.max(1, p - 1))}
+                          disabled={!hasPrev || isFetching}
+                        >
+                          Prev
+                        </Button>
+
+                        <div className="text-sm">{currentPage}</div>
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setPage((p) => p + 1)}
+                          disabled={!hasNext || isFetching}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  </>
                 )}
               </div>
             </CardContent>

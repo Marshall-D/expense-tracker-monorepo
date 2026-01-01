@@ -1,4 +1,5 @@
 // packages/client/src/hooks/useExpenses.ts
+
 import {
   useMutation,
   useQuery,
@@ -18,7 +19,7 @@ import type {
  * params corresponds to query params supported by the backend (from, to, category, limit, page, q)
  */
 export const useExpenses = (params?: Record<string, any>) =>
-  useQuery<ExpensesListResponse>({
+  useQuery<ExpensesListResponse, Error>({
     queryKey: [queryKeys.expenses, params ?? {}],
     queryFn: () => expensesService.fetchExpenses(params),
     // keepPreviousData helps smooth pagination transitions

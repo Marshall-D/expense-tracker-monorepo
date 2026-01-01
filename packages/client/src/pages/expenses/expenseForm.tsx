@@ -1,4 +1,5 @@
 // packages/client/src/pages/expenses/ExpenseForm.tsx
+
 import React, { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -6,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Expense, ExpenseCreatePayload } from "@/types/expense";
 import { useCategories } from "@/hooks/useCategories";
+import { t } from "@/lib/toast";
 
 type Props = {
   initial?: Partial<Expense>;
@@ -23,7 +25,8 @@ export default function ExpenseForm({
   const [amount, setAmount] = useState<string>(
     initial.amount?.toString() ?? ""
   );
-  const [currency, setCurrency] = useState(initial.currency ?? "NGN");
+  // currency is fixed to NGN and non-editable
+  const [currency] = useState<string>("NGN");
   const [description, setDescription] = useState(initial.description ?? "");
   const [categoryId, setCategoryId] = useState<string>(
     initial.categoryId ?? ""
@@ -51,7 +54,6 @@ export default function ExpenseForm({
     }
 
     setAmount(initial.amount?.toString() ?? "");
-    setCurrency(initial.currency ?? "NGN");
     setDescription(initial.description ?? "");
     setCategoryId(initial.categoryId ?? "");
     setDate(initial.date ?? new Date().toISOString().slice(0, 10));
@@ -61,10 +63,6 @@ export default function ExpenseForm({
   const onAmountChange = (val: string) => {
     touchedRef.current = true;
     setAmount(val);
-  };
-  const onCurrencyChange = (val: string) => {
-    touchedRef.current = true;
-    setCurrency(val);
   };
   const onDescriptionChange = (val: string) => {
     touchedRef.current = true;
@@ -85,11 +83,13 @@ export default function ExpenseForm({
     const parsed = Number(amount);
     if (!parsed || parsed <= 0) {
       setError("Enter a valid amount greater than 0");
+      t.error("Enter a valid amount greater than 0");
       return;
     }
 
     if (!categoryId) {
       setError("Please select a category");
+      t.error("Please select a category");
       return;
     }
 
@@ -97,14 +97,20 @@ export default function ExpenseForm({
     try {
       const payload: ExpenseCreatePayload = {
         amount: parsed,
-        currency,
+        currency, // guaranteed NGN
         description,
         categoryId,
         date,
       };
       await onSubmit(payload);
+      // success messages are usually shown by hooks, but add fallback here
+      t.success(
+        submitLabel.includes("Add") ? "Expense added" : "Expense saved"
+      );
     } catch (err: any) {
-      setError(err?.message ?? "Failed");
+      const msg = err?.message ?? "Failed";
+      setError(msg);
+      t.error(msg);
       throw err;
     } finally {
       setLoading(false);
@@ -134,16 +140,10 @@ export default function ExpenseForm({
 
             <div>
               <Label htmlFor="currency">Currency</Label>
-              <select
-                id="currency"
-                value={currency}
-                onChange={(e) => onCurrencyChange(e.target.value)}
-                className="w-full h-10 px-3 rounded-md border border-border/20 bg-background/50"
-              >
-                <option value="NGN">NGN</option>
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-              </select>
+              {/* Display currency as readonly text so user cannot change it */}
+              <div className="h-10 flex items-center px-3 rounded-md border border-border/20 bg-background/50">
+                <span className="font-medium">NGN</span>
+              </div>
             </div>
           </div>
 

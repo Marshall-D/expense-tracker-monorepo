@@ -8,6 +8,7 @@ import type {
   MonthlyReportResponse,
   ByCategoryResponse,
 } from "@/types/report";
+import { t } from "@/lib/toast";
 
 /**
  * useTrends - fetch last N months trend
@@ -44,11 +45,33 @@ export const useCategoryReport = (from: string, to: string) =>
 /**
  * useExportExpenses - mutation that triggers CSV download
  * Caller should provide from/to strings (ISO yyyy-mm-dd)
+ *
+ * This hook shows toast messages:
+ * - loading toast when export starts
+ * - success toast when server responded (download process can follow)
+ * - error toast if export failed
  */
 export const useExportExpenses = () =>
-  useMutation({
-    mutationFn: async (vars: { from: string; to: string }) => {
+  useMutation<any, Error, { from: string; to: string }>({
+    mutationFn: async (vars) => {
       const resp = await reportService.exportExpenses(vars.from, vars.to);
       return resp;
+    },
+    onMutate: () => {
+      // show an ephemeral loading toast (we dismiss or replace later)
+      t.loading("Preparing CSV…");
+    },
+    onSuccess: (data) => {
+      // dismiss loading then show success
+      t.dismiss();
+      t.success("CSV ready — starting download");
+      // note: actual file download is handled by the caller (component).
+    },
+    onError: (err: any) => {
+      t.dismiss();
+      const msg =
+        (err && (err.response?.data?.message || err.message)) ||
+        "Export failed";
+      t.error(msg, { duration: 7000 });
     },
   });

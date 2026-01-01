@@ -1,4 +1,5 @@
 // packages/client/src/pages/auth/login.tsx
+
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import {
 import { Wallet } from "lucide-react";
 import ROUTES from "@/utils/routes";
 import { useLogin } from "@/hooks/useLogin";
+import { t } from "@/lib/toast";
 
 export default function LoginPage(): JSX.Element {
   const navigate = useNavigate();
@@ -23,20 +25,38 @@ export default function LoginPage(): JSX.Element {
   const { mutateAsync, status } = mutation;
   const isLoading = status === "pending";
 
+  const focusEmail = () => {
+    const el = document.getElementById("email") as HTMLInputElement | null;
+    if (el) {
+      try {
+        el.focus();
+        el.select();
+      } catch {}
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+    // stronger prevention to avoid accidental navigation/refresh from default behaviour
     e.preventDefault();
+    e.stopPropagation();
+
     setFormError(null);
     const form = new FormData(e.currentTarget);
     const email = String(form.get("email") || "").trim();
     const password = String(form.get("password") || "");
 
     if (!email || !password) {
-      setFormError("Email and password are required.");
+      const msg = "Email and password are required.";
+      setFormError(msg);
+      // show longer toast so user sees it
+      t.error(msg, { duration: 8000 });
+      focusEmail();
       return;
     }
 
     try {
       await mutateAsync({ email, password });
+      // useLogin.onSuccess shows success toast centrally; just navigate
       navigate(ROUTES.DASHBOARD);
     } catch (err: any) {
       const msg =
@@ -45,6 +65,10 @@ export default function LoginPage(): JSX.Element {
         err?.message ||
         "Login failed";
       setFormError(msg);
+      // show toast with longer duration so user can read it
+      t.error(msg, { duration: 8000 });
+      focusEmail();
+      // do not rethrow or navigate
     }
   };
 
@@ -62,7 +86,7 @@ export default function LoginPage(): JSX.Element {
         </CardHeader>
 
         <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleLogin} className="space-y-4" noValidate>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -87,13 +111,16 @@ export default function LoginPage(): JSX.Element {
             </div>
 
             {formError && (
-              <div className="text-sm text-destructive">{formError}</div>
+              <div className="text-sm text-destructive" role="alert">
+                {formError}
+              </div>
             )}
 
             <Button
               type="submit"
               className="w-full rounded-full"
               disabled={isLoading}
+              aria-busy={isLoading}
             >
               {isLoading ? "Signing in..." : "Login"}
             </Button>

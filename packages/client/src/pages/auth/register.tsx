@@ -1,4 +1,5 @@
 // packages/client/src/pages/auth/register.tsx
+
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import ROUTES from "@/utils/routes";
@@ -15,6 +16,7 @@ import {
 } from "@/components/ui/card";
 import { Wallet } from "lucide-react";
 import { useRegister } from "@/hooks/useRegister";
+import { t } from "@/lib/toast";
 
 export default function RegisterPage(): JSX.Element {
   const navigate = useNavigate();
@@ -23,8 +25,20 @@ export default function RegisterPage(): JSX.Element {
   const { mutateAsync, status } = mutation;
   const isLoading = status === "pending";
 
+  const focusField = (id: string) => {
+    const el = document.getElementById(id) as HTMLInputElement | null;
+    if (el) {
+      try {
+        el.focus();
+        el.select();
+      } catch {}
+    }
+  };
+
   const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    e.stopPropagation();
+
     setFormError(null);
     const form = new FormData(e.currentTarget);
     const name = String(form.get("name") || "").trim();
@@ -32,17 +46,27 @@ export default function RegisterPage(): JSX.Element {
     const password = String(form.get("password") || "");
 
     if (!name || !email || !password) {
-      setFormError("All fields are required.");
+      const msg = "All fields are required.";
+      setFormError(msg);
+      t.error(msg, { duration: 8000 });
+      // focus the first missing field
+      if (!name) focusField("name");
+      else if (!email) focusField("email");
+      else focusField("password");
       return;
     }
 
     try {
       await mutateAsync({ name, email, password });
+      // onSuccess toast is handled in useRegister
       navigate(ROUTES.DASHBOARD);
     } catch (err: any) {
       const msg =
         err?.response?.data?.message || err?.message || "Registration failed";
       setFormError(msg);
+      t.error(msg, { duration: 8000 });
+      // focus email for correction (server validation likely about email/password)
+      focusField("email");
     }
   };
 
@@ -62,7 +86,7 @@ export default function RegisterPage(): JSX.Element {
         </CardHeader>
 
         <CardContent>
-          <form onSubmit={handleRegister} className="space-y-4">
+          <form onSubmit={handleRegister} className="space-y-4" noValidate>
             <div className="space-y-2">
               <Label htmlFor="name">Full Name</Label>
               <Input
@@ -98,13 +122,16 @@ export default function RegisterPage(): JSX.Element {
             </div>
 
             {formError && (
-              <div className="text-sm text-destructive">{formError}</div>
+              <div className="text-sm text-destructive" role="alert">
+                {formError}
+              </div>
             )}
 
             <Button
               type="submit"
               className="w-full rounded-full"
               disabled={isLoading}
+              aria-busy={isLoading}
             >
               {isLoading ? "Creating account..." : "Sign Up"}
             </Button>

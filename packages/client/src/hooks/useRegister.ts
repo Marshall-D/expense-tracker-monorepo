@@ -7,6 +7,7 @@ import {
 import { registerApi } from "@/services/authService";
 import { useAuth } from "@/context/authProvider";
 import type { RegisterPayload, AuthResponse } from "@/types/auth";
+import { t } from "@/lib/toast";
 
 /**
  * useRegister
@@ -30,6 +31,10 @@ export function useRegister(): UseMutationResult<
       qc.invalidateQueries({ queryKey: ["expenses"] });
       qc.invalidateQueries({ queryKey: ["budgets"] });
       qc.invalidateQueries({ queryKey: ["categories"] });
+
+      // show welcome toast on successful registration/login
+      const name = (data && data.user && (data.user as any).name) || "there";
+      t.success(`Welcome, ${name}!`);
     },
   });
 }

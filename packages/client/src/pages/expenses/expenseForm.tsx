@@ -1,5 +1,4 @@
 // packages/client/src/pages/expenses/ExpenseForm.tsx
-
 import React, { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -80,16 +79,29 @@ export default function ExpenseForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    // amount validation
     const parsed = Number(amount);
     if (!parsed || parsed <= 0) {
-      setError("Enter a valid amount greater than 0");
-      t.error("Enter a valid amount greater than 0");
+      const msg = "Enter a valid amount greater than 0";
+      setError(msg);
+      t.error(msg);
       return;
     }
 
+    // category validation
     if (!categoryId) {
-      setError("Please select a category");
-      t.error("Please select a category");
+      const msg = "Please select a category";
+      setError(msg);
+      t.error(msg);
+      return;
+    }
+
+    // description validation: required and not empty after trimming
+    if (!description || description.trim().length === 0) {
+      const msg = "Description is required";
+      setError(msg);
+      t.error(msg);
       return;
     }
 
@@ -98,12 +110,12 @@ export default function ExpenseForm({
       const payload: ExpenseCreatePayload = {
         amount: parsed,
         currency, // guaranteed NGN
-        description,
+        description: description.trim(),
         categoryId,
         date,
       };
       await onSubmit(payload);
-      // success messages are usually shown by hooks, but add fallback here
+      // success message: prefer hooks to show it, but add fallback
       t.success(
         submitLabel.includes("Add") ? "Expense added" : "Expense saved"
       );
@@ -123,7 +135,7 @@ export default function ExpenseForm({
         <CardTitle>{submitLabel} expense</CardTitle>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="amount">Amount</Label>
@@ -194,6 +206,7 @@ export default function ExpenseForm({
               rows={3}
               className="w-full rounded-md border border-border/20 bg-background/50 p-2"
               placeholder="e.g. Weekly groceries"
+              required
             />
           </div>
 

@@ -27,6 +27,8 @@ import { useExpenses, useDeleteExpense } from "@/hooks/useExpenses";
 import { useCategories } from "@/hooks/useCategories";
 import { useExportExpenses } from "@/hooks/useReports";
 import { format } from "date-fns";
+import InfoModal from "@/components/ui/infoModal";
+import { t } from "@/lib/toast";
 
 /** Small debounce hook used for search input */
 function useDebouncedValue<T>(value: T, delayMs = 300) {
@@ -139,15 +141,15 @@ function ExpensesContent() {
     initialTo || undefined
   );
 
-  // pagination state
-  const [page, setPage] = useState<number>(initialPage || 1);
-  const limit = 50; // fixed page size for UI; backend caps at 100
-
   // keep searchTerm in sync if URL changed externally
   useEffect(() => {
     setSearchTerm(initialQ);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // pagination state
+  const [page, setPage] = useState<number>(initialPage || 1);
+  const limit = 50; // fixed page size for UI; backend caps at 100
 
   // Reset page to 1 whenever filters/search change
   useEffect(() => {
@@ -181,6 +183,10 @@ function ExpensesContent() {
   const { data, isLoading, isError, isFetching } = useExpenses(params);
   const deleteMutation = useDeleteExpense();
   const isDeleting = deleteMutation.status === "pending";
+
+  // state for deletion modal
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   // push applied filters + q + page into URL (shareable)
   useEffect(() => {
@@ -219,12 +225,23 @@ function ExpensesContent() {
     setDrawerOpen(false);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Delete this expense?")) return;
+  // open modal when user clicks delete; show modal instead of confirm()
+  const requestDelete = (id: string) => {
+    setDeleteTargetId(id);
+    setDeleteModalOpen(true);
+  };
+
+  const performDelete = async () => {
+    if (!deleteTargetId) return;
     try {
-      await deleteMutation.mutateAsync(id);
-    } catch (err) {
-      console.error("Delete failed", err);
+      await deleteMutation.mutateAsync(deleteTargetId);
+    } catch (err: any) {
+      // hook shows a toast; we add fallback
+      const msg = err?.message ?? "Delete failed";
+      t.error(msg);
+    } finally {
+      setDeleteModalOpen(false);
+      setDeleteTargetId(null);
     }
   };
 
@@ -483,15 +500,13 @@ function ExpensesContent() {
         )}
       </div>
 
-      {/* MAIN: left content + right filter (desktop uses flex row so aside stays right) */}
+      {/* MAIN LIST */}
       <div className="flex flex-col lg:flex-row gap-6">
-        {/* LEFT: main table (take remaining space) */}
         <div className="flex-1">
           <Card className="border-border/40 bg-card/40">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div className="text-sm text-muted-foreground">
-                  {/* Real results summary */}
                   {isLoading || isFetching ? (
                     <span>Loading results…</span>
                   ) : total === 0 ? (
@@ -503,7 +518,6 @@ function ExpensesContent() {
                   )}
                 </div>
 
-                {/* small pager info (desktop only) */}
                 <div className="flex items-center gap-2">
                   <div className="text-xs text-muted-foreground">
                     Page {currentPage}
@@ -579,7 +593,7 @@ function ExpensesContent() {
                                     variant="ghost"
                                     size="icon"
                                     className="h-8 w-8 hover:text-destructive"
-                                    onClick={() => handleDelete(expense.id)}
+                                    onClick={() => requestDelete(expense.id)}
                                     disabled={isDeleting}
                                   >
                                     <Trash2 className="h-4 w-4" />
@@ -647,6 +661,21 @@ function ExpensesContent() {
           </aside>
         ) : null}
       </div>
+
+      {/* Delete confirmation modal */}
+      <InfoModal
+        open={deleteModalOpen}
+        title="Delete expense?"
+        message="This action will permanently delete the expense. Are you sure?"
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        loading={isDeleting}
+        onCancel={() => {
+          setDeleteModalOpen(false);
+          setDeleteTargetId(null);
+        }}
+        onConfirm={performDelete}
+      />
 
       {/* Mobile/Tablet Drawer */}
       {!isDesktop && (

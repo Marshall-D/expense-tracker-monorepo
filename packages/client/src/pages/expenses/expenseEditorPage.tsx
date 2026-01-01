@@ -1,4 +1,5 @@
 // packages/client/src/pages/expenses/ExpenseEditorPage.tsx
+
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import ROUTES from "@/utils/routes";
@@ -11,6 +12,8 @@ import {
   useUpdateExpense,
   useDeleteExpense,
 } from "@/hooks/useExpenses";
+import InfoModal from "@/components/ui/infoModal";
+import { t } from "@/lib/toast";
 
 export default function ExpenseEditorPage(): JSX.Element {
   const { id } = useParams();
@@ -30,6 +33,9 @@ export default function ExpenseEditorPage(): JSX.Element {
   const isCreating = createMutation.status === "pending";
   const isUpdating = updateMutation.status === "pending";
   const isDeleting = deleteMutation.status === "pending";
+
+  // modal state for delete confirmation
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   // map fetched expense to initial form shape (Partial<Expense>)
   const initial = useMemo<Partial<Expense> | undefined>(() => {
@@ -57,19 +63,23 @@ export default function ExpenseEditorPage(): JSX.Element {
         navigate(ROUTES.EXPENSES);
       }
     } catch (err: any) {
-      setError(err?.message ?? "Save failed");
+      const msg = err?.message ?? "Save failed";
+      setError(msg);
+      t.error(msg);
     }
   };
 
-  const handleDelete = async () => {
+  const handleDeleteConfirmed = async () => {
     if (!id) return;
-    if (!confirm("Delete this expense? This action cannot be undone.")) return;
     setError(null);
     try {
       await deleteMutation.mutateAsync(id);
+      setConfirmOpen(false);
       navigate(ROUTES.EXPENSES);
     } catch (err: any) {
-      setError(err?.message ?? "Delete failed");
+      const msg = err?.message ?? "Delete failed";
+      setError(msg);
+      t.error(msg);
     }
   };
 
@@ -101,7 +111,7 @@ export default function ExpenseEditorPage(): JSX.Element {
             <Button
               variant="destructive"
               size="sm"
-              onClick={handleDelete}
+              onClick={() => setConfirmOpen(true)}
               disabled={isDeleting}
             >
               {isDeleting ? "Deleting…" : "Delete"}
@@ -114,6 +124,17 @@ export default function ExpenseEditorPage(): JSX.Element {
         initial={initial}
         submitLabel={isNew ? "Add Expense" : "Save changes"}
         onSubmit={handleSubmit}
+      />
+
+      <InfoModal
+        open={confirmOpen}
+        title="Delete expense?"
+        message="This action will permanently delete the expense. Are you sure?"
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        loading={isDeleting}
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={handleDeleteConfirmed}
       />
     </div>
   );

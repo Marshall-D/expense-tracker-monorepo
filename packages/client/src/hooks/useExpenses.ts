@@ -1,5 +1,4 @@
 // packages/client/src/hooks/useExpenses.ts
-
 import {
   useMutation,
   useQuery,
@@ -13,6 +12,7 @@ import type {
   ExpensesListResponse,
   Expense,
 } from "@/types/expense";
+import { t } from "@/lib/toast";
 
 /**
  * useExpenses - fetch paginated expenses list
@@ -102,6 +102,13 @@ export const useCreateExpense = () => {
       if (context?.previous) {
         qc.setQueryData([queryKeys.expenses], context.previous);
       }
+      t.error(err?.message ?? "Failed to add expense");
+    },
+
+    onSuccess: (data, variables, context) => {
+      // server returned id; invalidate to sync and show success toast
+      qc.invalidateQueries({ queryKey: [queryKeys.expenses] });
+      t.success("Expense added");
     },
 
     onSettled: () => {
@@ -182,6 +189,13 @@ export const useUpdateExpense = () => {
       if (context?.previousItem) {
         qc.setQueryData([queryKeys.expense, vars.id], context.previousItem);
       }
+      t.error(err?.message ?? "Failed to update expense");
+    },
+
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [queryKeys.expenses] });
+      qc.invalidateQueries({ queryKey: [queryKeys.expense] });
+      t.success("Expense updated");
     },
 
     onSettled: () => {
@@ -232,6 +246,12 @@ export const useDeleteExpense = () => {
       if (context?.previous) {
         qc.setQueryData([queryKeys.expenses], context.previous);
       }
+      t.error(err?.message ?? "Failed to delete expense");
+    },
+
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [queryKeys.expenses] });
+      t.success("Expense deleted");
     },
 
     onSettled: () => {

@@ -8,6 +8,8 @@ import { Plus, Tags, Trash2 } from "lucide-react";
 import ROUTES from "@/utils/routes";
 import { useCategories } from "@/hooks/useCategories";
 import * as categoryService from "@/services/categoryService";
+import InfoModal from "@/components/ui/infoModal";
+import { t } from "@/lib/toast";
 
 export default function CategoriesPage() {
   const {
@@ -16,20 +18,38 @@ export default function CategoriesPage() {
     isError,
     refetch,
   } = useCategories(true);
+
   const [deleting, setDeleting] = useState<string | null>(null);
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Delete category "${name}"? This action cannot be undone.`))
-      return;
+  // modal state
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+
+  // when user clicks the trash icon, open modal instead of confirm()
+  const requestDelete = (id: string, name: string) => {
+    setDeleteTarget({ id, name });
+    setDeleteModalOpen(true);
+  };
+
+  const performDelete = async () => {
+    if (!deleteTarget) return;
+    const { id, name } = deleteTarget;
+    setDeleting(id);
     try {
-      setDeleting(id);
       await categoryService.deleteCategory(id);
+      t.success(`Category "${name}" deleted`);
+      // refresh categories
       await refetch();
     } catch (err: any) {
       console.error("delete category failed", err);
-      alert(err?.message ?? "Delete failed");
+      t.error(err?.message ?? "Delete failed");
     } finally {
       setDeleting(null);
+      setDeleteModalOpen(false);
+      setDeleteTarget(null);
     }
   };
 
@@ -140,8 +160,9 @@ export default function CategoriesPage() {
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 text-destructive rounded-lg"
-                    onClick={() => handleDelete(category.id, category.name)}
+                    onClick={() => requestDelete(category.id, category.name)}
                     disabled={deleting === category.id}
+                    aria-label={`Delete ${category.name}`}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -156,6 +177,23 @@ export default function CategoriesPage() {
           ))}
         </div>
       )}
+
+      {/* Confirmation modal */}
+      <InfoModal
+        open={deleteModalOpen}
+        title={
+          deleteTarget ? `Delete "${deleteTarget.name}"?` : "Delete category?"
+        }
+        message="Deleting this category is permanent. Expenses already created with this category will not be deleted. Are you sure?"
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        loading={Boolean(deleting)}
+        onCancel={() => {
+          setDeleteModalOpen(false);
+          setDeleteTarget(null);
+        }}
+        onConfirm={performDelete}
+      />
     </div>
   );
 }

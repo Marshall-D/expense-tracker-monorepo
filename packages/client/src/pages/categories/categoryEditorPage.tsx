@@ -8,6 +8,8 @@ import * as categoryService from "@/services/categoryService";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/queryKeys";
 import CategoryForm from "./categoryForm";
+import InfoModal from "@/components/ui/infoModal";
+import { t } from "@/lib/toast";
 
 export default function CategoryEditorPage(): JSX.Element {
   const { id } = useParams();
@@ -22,6 +24,9 @@ export default function CategoryEditorPage(): JSX.Element {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // modal state for delete
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -64,9 +69,11 @@ export default function CategoryEditorPage(): JSX.Element {
     try {
       if (isNew) {
         await categoryService.createCategory(payload);
+        t.success("Category created");
       } else {
         if (!id) throw new Error("Missing id");
         await categoryService.updateCategory(id, payload);
+        t.success("Category updated");
       }
 
       // ensure categories list refetches immediately
@@ -75,6 +82,7 @@ export default function CategoryEditorPage(): JSX.Element {
       navigate(ROUTES.CATEGORIES);
     } catch (err: any) {
       setError(err?.message ?? "Save failed");
+      t.error(err?.message ?? "Save failed");
     } finally {
       setSaving(false);
     }
@@ -82,19 +90,19 @@ export default function CategoryEditorPage(): JSX.Element {
 
   const handleDelete = async () => {
     if (!id) return;
-    if (!confirm("Delete this category? This action cannot be undone.")) return;
     setDeleting(true);
     try {
       await categoryService.deleteCategory(id);
-
+      t.success("Category deleted");
       // ensure categories list refetches immediately
       await invalidateCategories();
-
       navigate(ROUTES.CATEGORIES);
     } catch (err: any) {
       setError(err?.message ?? "Delete failed");
+      t.error(err?.message ?? "Delete failed");
     } finally {
       setDeleting(false);
+      setDeleteModalOpen(false);
     }
   };
 
@@ -128,7 +136,7 @@ export default function CategoryEditorPage(): JSX.Element {
             <Button
               variant="destructive"
               size="sm"
-              onClick={handleDelete}
+              onClick={() => setDeleteModalOpen(true)}
               disabled={deleting}
             >
               {deleting ? "Deleting…" : "Delete"}
@@ -141,6 +149,17 @@ export default function CategoryEditorPage(): JSX.Element {
         initial={initial ?? undefined}
         submitLabel={isNew ? "Create Category" : "Save Changes"}
         onSubmit={handleSubmit}
+      />
+
+      <InfoModal
+        open={deleteModalOpen}
+        title="Delete category?"
+        message="Deleting this category is permanent. Expenses already created with this category will not be deleted. Are you sure?"
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        loading={deleting}
+        onCancel={() => setDeleteModalOpen(false)}
+        onConfirm={handleDelete}
       />
     </div>
   );

@@ -1,20 +1,45 @@
 // packages/client/src/pages/budgets/budgets.tsx
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import ROUTES from "@/utils/routes";
 import { useBudgets, useDeleteBudget } from "@/hooks/useBudgets";
 import { BudgetCard } from "@/components/budgetCard";
+import InfoModal from "@/components/ui/infoModal";
+import { t } from "@/lib/toast";
 
 export default function BudgetsPage() {
   const { data: budgets = [], isLoading, isError } = useBudgets();
   const deleteMutation = useDeleteBudget();
   const isDeleting = deleteMutation.status === "pending";
 
-  const handleDelete = async (id: string, category: string) => {
-    if (!confirm(`Delete budget for ${category}?`)) return;
-    await deleteMutation.mutateAsync(id);
+  // modal state
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    category: string;
+  } | null>(null);
+
+  // called by BudgetCard -> onDelete(id, category)
+  const requestDelete = (id: string, category: string) => {
+    setDeleteTarget({ id, category });
+    setDeleteModalOpen(true);
+  };
+
+  const performDelete = async () => {
+    if (!deleteTarget) return;
+    const { id, category } = deleteTarget;
+    try {
+      await deleteMutation.mutateAsync(id);
+      t.success(`Budget for ${category} deleted`);
+    } catch (err: any) {
+      console.error("delete budget failed", err);
+      t.error(err?.message ?? "Delete failed");
+    } finally {
+      setDeleteModalOpen(false);
+      setDeleteTarget(null);
+    }
   };
 
   return (
@@ -46,12 +71,30 @@ export default function BudgetsPage() {
             <BudgetCard
               key={budget.id}
               budget={budget}
-              onDelete={handleDelete}
+              onDelete={requestDelete}
               isDeleting={isDeleting}
             />
           ))}
         </div>
       )}
+
+      <InfoModal
+        open={deleteModalOpen}
+        title={
+          deleteTarget
+            ? `Delete budget for ${deleteTarget.category}?`
+            : "Delete budget?"
+        }
+        message="This action will permanently delete the budget. Are you sure?"
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        loading={isDeleting}
+        onCancel={() => {
+          setDeleteModalOpen(false);
+          setDeleteTarget(null);
+        }}
+        onConfirm={performDelete}
+      />
     </div>
   );
 }

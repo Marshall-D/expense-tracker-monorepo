@@ -1,4 +1,5 @@
 // packages/client/src/pages/budgets/BudgetEditorPage.tsx
+
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import ROUTES from "@/utils/routes";
@@ -11,6 +12,8 @@ import {
   useDeleteBudget,
 } from "@/hooks/useBudgets";
 import BudgetForm from "./budgetForm";
+import InfoModal from "@/components/ui/infoModal";
+import { t } from "@/lib/toast";
 
 export default function BudgetEditorPage(): JSX.Element {
   const { id } = useParams(); // id comes from route /dashboard/budgets/:id
@@ -67,11 +70,11 @@ export default function BudgetEditorPage(): JSX.Element {
           createPayload.category = payload.category;
         }
         await createMutation.mutateAsync(createPayload);
+        t.success("Budget created");
       } else {
         if (!id) throw new Error("Missing id");
 
         // build update payload with strict typing:
-        // BudgetUpdatePayload = Partial<{ categoryId: string | null; category: string; periodStart: string; amount: number; }>
         const updatePayload: any = {};
         if (typeof payload.amount !== "undefined")
           updatePayload.amount = payload.amount;
@@ -84,7 +87,6 @@ export default function BudgetEditorPage(): JSX.Element {
           typeof payload.category !== "undefined" &&
           payload.category !== null
         ) {
-          // include category only if it's a non-null string (the update type expects string, not null)
           updatePayload.category = payload.category;
         }
 
@@ -93,24 +95,39 @@ export default function BudgetEditorPage(): JSX.Element {
         }
 
         await updateMutation.mutateAsync({ id, payload: updatePayload });
+        t.success("Budget updated");
       }
 
       // optimistic updates handled in hooks; navigate to list
       navigate(ROUTES.BUDGETS);
     } catch (err: any) {
-      setError(err?.message ?? "Save failed");
+      const msg = err?.message ?? "Save failed";
+      setError(msg);
+      t.error(msg);
     }
   };
 
-  const handleDelete = async () => {
+  // Modal state for delete confirmation
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
+  const handleDeleteRequest = () => {
+    // open modal
+    setDeleteModalOpen(true);
+  };
+
+  const performDelete = async () => {
     if (!id) return;
-    if (!confirm("Delete this budget? This action cannot be undone.")) return;
     setError(null);
     try {
       await deleteMutation.mutateAsync(id);
+      t.success("Budget deleted");
       navigate(ROUTES.BUDGETS);
     } catch (err: any) {
-      setError(err?.message ?? "Delete failed");
+      const msg = err?.message ?? "Delete failed";
+      setError(msg);
+      t.error(msg);
+    } finally {
+      setDeleteModalOpen(false);
     }
   };
 
@@ -144,7 +161,7 @@ export default function BudgetEditorPage(): JSX.Element {
             <Button
               variant="destructive"
               size="sm"
-              onClick={handleDelete}
+              onClick={handleDeleteRequest}
               disabled={isDeleting}
             >
               {isDeleting ? "Deleting…" : "Delete"}
@@ -158,6 +175,17 @@ export default function BudgetEditorPage(): JSX.Element {
         submitLabel={isNew ? "Create Budget" : "Save Changes"}
         onSubmit={handleSubmit}
         submitting={isCreating || isUpdating}
+      />
+
+      <InfoModal
+        open={deleteModalOpen}
+        title="Delete budget?"
+        message="This action will permanently delete the budget. Are you sure?"
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        loading={isDeleting}
+        onCancel={() => setDeleteModalOpen(false)}
+        onConfirm={performDelete}
       />
     </div>
   );

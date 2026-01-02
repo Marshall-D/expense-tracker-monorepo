@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Tags, Trash2 } from "lucide-react";
 import ROUTES from "@/utils/routes";
-import { useCategories } from "@/hooks/useCategories";
+import { useCategories } from "@/hooks";
 import * as categoryService from "@/services/categoryService";
 import InfoModal from "@/components/ui/infoModal";
 import { t } from "@/lib/toast";

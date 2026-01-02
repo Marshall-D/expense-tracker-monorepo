@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import type { Budget } from "@/types/budget";
-import { useCategories } from "@/hooks/useCategories";
+import { useCategories } from "@/hooks";
 import { format } from "date-fns";
 
 type Props = {

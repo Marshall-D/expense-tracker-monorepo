@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import ROUTES from "@/utils/routes";
-import { useBudgets, useDeleteBudget } from "@/hooks/useBudgets";
+import { useBudgets, useDeleteBudget } from "@/hooks";
 import { BudgetCard } from "@/components/budgetCard";
 import InfoModal from "@/components/ui/infoModal";
 import { t } from "@/lib/toast";

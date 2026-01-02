@@ -23,9 +23,12 @@ import {
   X,
 } from "lucide-react";
 import ROUTES from "@/utils/routes";
-import { useExpenses, useDeleteExpense } from "@/hooks/useExpenses";
-import { useCategories } from "@/hooks/useCategories";
-import { useExportExpenses } from "@/hooks/useReports";
+import {
+  useExpenses,
+  useDeleteExpense,
+  useCategories,
+  useExportExpenses,
+} from "@/hooks";
 import { format } from "date-fns";
 import InfoModal from "@/components/ui/infoModal";
 import { t } from "@/lib/toast";

@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/card";
 import { Wallet } from "lucide-react";
 import ROUTES from "@/utils/routes";
-import { useLogin } from "@/hooks/useLogin";
+import { useLogin } from "@/hooks";
 import { t } from "@/lib/toast";
 
 export default function LoginPage(): JSX.Element {

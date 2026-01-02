@@ -11,8 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Pencil, Trash2, Wallet, AlertCircle } from "lucide-react";
 import ROUTES from "@/utils/routes";
-import { useBudgetSpending } from "@/hooks/useBudgetSpending";
 import type { Budget } from "@/types/budget";
+import { useBudgetSpending } from "@/hooks";
 
 type Props = {
   budget: Budget;

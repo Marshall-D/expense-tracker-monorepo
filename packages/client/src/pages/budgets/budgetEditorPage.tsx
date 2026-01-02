@@ -10,7 +10,7 @@ import {
   useCreateBudget,
   useUpdateBudget,
   useDeleteBudget,
-} from "@/hooks/useBudgets";
+} from "@/hooks";
 import BudgetForm from "./budgetForm";
 import InfoModal from "@/components/ui/infoModal";
 import { t } from "@/lib/toast";

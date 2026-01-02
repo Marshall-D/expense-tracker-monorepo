@@ -15,7 +15,7 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Wallet } from "lucide-react";
-import { useRegister } from "@/hooks/useRegister";
+import { useRegister } from "@/hooks";
 import { t } from "@/lib/toast";
 
 export default function RegisterPage(): JSX.Element {

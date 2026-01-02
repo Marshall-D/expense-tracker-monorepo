@@ -27,9 +27,13 @@ import {
   ArrowDownRight,
 } from "lucide-react";
 
-import { useTrends, useCategoryReport } from "@/hooks/useReports";
-import { useExpenses } from "@/hooks/useExpenses";
-import { useCategories } from "@/hooks/useCategories";
+import {
+  useTrends,
+  useCategoryReport,
+  useExpenses,
+  useCategories,
+} from "@/hooks";
+
 import { format } from "date-fns";
 
 function monthLabel(isoMonth: string | null) {

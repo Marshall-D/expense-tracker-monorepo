@@ -11,7 +11,7 @@ import {
   useExpense,
   useUpdateExpense,
   useDeleteExpense,
-} from "@/hooks/useExpenses";
+} from "@/hooks";
 import InfoModal from "@/components/ui/infoModal";
 import { t } from "@/lib/toast";
 

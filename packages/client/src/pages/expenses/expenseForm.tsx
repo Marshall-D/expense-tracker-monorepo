@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Expense, ExpenseCreatePayload } from "@/types/expense";
-import { useCategories } from "@/hooks/useCategories";
+import { useCategories } from "@/hooks";
 import { t } from "@/lib/toast";
 
 type Props = {

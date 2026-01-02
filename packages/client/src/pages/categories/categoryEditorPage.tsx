@@ -1,7 +1,7 @@
 // packages/client/src/pages/categories/CategoryEditorPage.tsx
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import ROUTES from "@/utils/routes";
+import { ROUTES } from "@/utils";
 import type { Category } from "@/types/categories";
 import { Button } from "@/components/ui/button";
 import * as categoryService from "@/services";

@@ -11,7 +11,7 @@ import type {
   ExpenseCreatePayload,
   ExpensesListResponse,
   Expense,
-} from "@/types/expense";
+} from "@/types";
 
 /**
  * useExpenses - fetch paginated expenses list

@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Routes, Route } from "react-router-dom";
-import ROUTES from "@/utils/routes";
+import { ROUTES } from "@/utils";
 
 import LoginPage from "@/pages/auth/login";
 import RegisterPage from "@/pages/auth/register";

@@ -17,8 +17,9 @@ import {
   setUser as storageSetUser,
   queryKeys,
 } from "@/lib";
-import ROUTES from "@/utils/routes";
-import { User, AuthContextValue } from "@/types/auth";
+import { ROUTES } from "@/utils";
+
+import { User, AuthContextValue } from "@/types";
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 

@@ -29,4 +29,4 @@ const ROUTES = {
   REPORTS: "/dashboard/reports",
 };
 
-export default ROUTES;
+export { ROUTES };

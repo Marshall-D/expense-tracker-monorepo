@@ -22,7 +22,7 @@ import {
   Download,
   X,
 } from "lucide-react";
-import ROUTES from "@/utils/routes";
+import { ROUTES } from "@/utils";
 import {
   useExpenses,
   useDeleteExpense,

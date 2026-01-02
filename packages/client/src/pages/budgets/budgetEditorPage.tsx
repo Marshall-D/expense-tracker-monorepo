@@ -2,8 +2,8 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import ROUTES from "@/utils/routes";
-import type { Budget } from "@/types/budget";
+import { ROUTES } from "@/utils";
+import type { Budget } from "@/types";
 import { Button } from "@/components/ui/button";
 import {
   useBudget,

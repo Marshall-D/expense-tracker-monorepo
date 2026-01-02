@@ -1,6 +1,6 @@
 // packages/client/src/services/authService.ts
 import { api } from "@/lib";
-import { LoginPayload, AuthResponse, RegisterPayload } from "@/types/auth";
+import { LoginPayload, AuthResponse, RegisterPayload } from "@/types";
 
 export const loginApi = async (
   payload: LoginPayload

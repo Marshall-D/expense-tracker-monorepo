@@ -7,7 +7,7 @@ import type {
   TrendsResponse,
   MonthlyReportResponse,
   ByCategoryResponse,
-} from "@/types/report";
+} from "@/types";
 
 /**
  * useTrends - fetch last N months trend

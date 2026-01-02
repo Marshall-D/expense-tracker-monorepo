@@ -14,7 +14,7 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Wallet } from "lucide-react";
-import ROUTES from "@/utils/routes";
+import { ROUTES } from "@/utils";
 import { useLogin } from "@/hooks";
 import { t } from "@/lib";
 

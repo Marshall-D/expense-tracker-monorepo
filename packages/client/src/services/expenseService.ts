@@ -1,10 +1,6 @@
 // packages/client/src/services/expenseService.ts
 import { api } from "@/lib";
-import {
-  Expense,
-  ExpenseCreatePayload,
-  ExpensesListResponse,
-} from "@/types/expense";
+import { Expense, ExpenseCreatePayload, ExpensesListResponse } from "@/types";
 
 /**
  * Service functions for expenses (HTTP layer).

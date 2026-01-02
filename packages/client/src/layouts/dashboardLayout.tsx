@@ -1,7 +1,7 @@
 // packages/client/src/layouts/dashboardLayout.tsx
 import React, { useState, useEffect } from "react";
 import { NavLink, Link, Outlet } from "react-router-dom";
-import ROUTES from "@/utils/routes";
+import { ROUTES } from "@/utils";
 import {
   Wallet,
   LayoutDashboard,

@@ -4,7 +4,7 @@ import {
   ByCategoryResponse,
   MonthlyReportResponse,
   TrendsResponse,
-} from "@/types/report";
+} from "@/types";
 
 /**
  * Thin wrappers for reporting endpoints.

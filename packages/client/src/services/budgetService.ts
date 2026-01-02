@@ -1,11 +1,7 @@
 // packages/client/src/services/budgetService.ts
 
 import { api } from "@/lib";
-import type {
-  Budget,
-  BudgetCreatePayload,
-  BudgetUpdatePayload,
-} from "@/types/budget";
+import type { Budget, BudgetCreatePayload, BudgetUpdatePayload } from "@/types";
 
 /**
  * Fetch list of budgets

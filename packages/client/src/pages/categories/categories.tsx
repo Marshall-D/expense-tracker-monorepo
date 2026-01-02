@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Tags, Trash2 } from "lucide-react";
-import ROUTES from "@/utils/routes";
+import { ROUTES } from "@/utils";
 import { useCategories } from "@/hooks";
 import * as categoryService from "@/services";
 import InfoModal from "@/components/ui/infoModal";

@@ -7,11 +7,7 @@ import {
 } from "@tanstack/react-query";
 import * as budgetService from "@/services";
 import { queryKeys } from "@/lib";
-import type {
-  Budget,
-  BudgetCreatePayload,
-  BudgetUpdatePayload,
-} from "@/types/budget";
+import type { Budget, BudgetCreatePayload, BudgetUpdatePayload } from "@/types";
 
 /**
  * useBudgets - fetch list of budgets

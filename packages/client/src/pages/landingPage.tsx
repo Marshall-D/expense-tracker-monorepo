@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, Wallet, PieChart, ShieldCheck } from "lucide-react";
-import ROUTES from "@/utils/routes";
+import { ROUTES } from "@/utils";
 
 export default function LandingPage(): JSX.Element {
   return (

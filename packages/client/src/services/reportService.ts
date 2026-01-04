@@ -1,4 +1,14 @@
 // packages/client/src/services/reportService.ts
+/**
+ * Thin wrappers for reporting endpoints.
+ *
+ * Responsibilities:
+ *  - Keep service layer tiny and typed
+ *  - Do not perform heavy transformations — leave that to UI components
+ *
+ * This file intentionally contains only simple fetch functions.
+ */
+
 import { api } from "@/lib";
 import {
   ByCategoryResponse,
@@ -7,15 +17,12 @@ import {
 } from "@/types";
 
 /**
- * Thin wrappers for reporting endpoints.
- * - Query params are simple primitives (numbers/strings).
+ * Fetch N months of trends. Server expects `months` as number.
  */
-
 export const fetchTrends = async (months = 6): Promise<TrendsResponse> => {
   const resp = await api.get<TrendsResponse>("/api/reports/trends", {
     params: { months },
   });
-  // server returns { months: [...] }
   return resp.data as TrendsResponse;
 };
 
@@ -39,8 +46,11 @@ export const fetchByCategory = async (
   return resp.data as ByCategoryResponse;
 };
 
+/**
+ * Export expenses as a CSV blob. Caller must handle downloading.
+ * Returns the raw axios response (with headers) so the UI can extract file name.
+ */
 export const exportExpenses = async (from: string, to: string) => {
-  // returns CSV blob response
   const resp = await api.get("/api/export/expenses", {
     params: { from, to, format: "csv" },
     responseType: "blob",

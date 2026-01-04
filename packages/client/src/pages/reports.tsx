@@ -1,4 +1,8 @@
-// packages/client/src/pages/reports.tsx
+/**
+ * packages/client/src/pages/reports.tsx
+
+ */
+
 import React, { useMemo, useState, useEffect } from "react";
 
 import {
@@ -23,38 +27,17 @@ import {
   CardDescription,
 } from "@/components";
 import { useTrends, useCategoryReport, useExportExpenses } from "@/hooks";
-import { format } from "date-fns";
 
-function monthLabel(isoMonth: string | null) {
-  if (!isoMonth) return "—";
-  try {
-    const [y, m] = isoMonth.split("-");
-    const d = new Date(Number(y), Number(m) - 1, 1);
-    return format(d, "MMM yyyy");
-  } catch {
-    return String(isoMonth);
-  }
-}
+import {
+  monthLabel,
+  monthShort,
+  monthToRange,
+  downloadResponseAsFile,
+} from "@/lib";
 
-function monthShort(isoMonth: string | null) {
-  if (!isoMonth) return "—";
-  try {
-    const [y, m] = isoMonth.split("-");
-    const d = new Date(Number(y), Number(m) - 1, 1);
-    return format(d, "MMM");
-  } catch {
-    return String(isoMonth);
-  }
-}
-
-function monthToRange(isoMonth: string) {
-  const [y, m] = isoMonth.split("-");
-  const year = Number(y);
-  const month = Number(m) - 1;
-  const start = new Date(Date.UTC(year, month, 1, 0, 0, 0));
-  const end = new Date(Date.UTC(year, month + 1, 0, 0, 0, 0));
-  return [format(start, "yyyy-MM-dd"), format(end, "yyyy-MM-dd")];
-}
+/**
+ * Reports page: visualize trends and by-category breakdowns.
+ */
 
 export function ReportsPage() {
   // trends window: fixed to last 6 months
@@ -64,15 +47,14 @@ export function ReportsPage() {
   const { data: trendsData, isLoading: trendsLoading } = useTrends(monthsAgo);
 
   // build available months list (oldest -> newest) from trends
-  const availableMonths = useMemo(() => {
-    return trendsData?.months?.map((m) => m.month) ?? [];
-  }, [trendsData]);
+  const availableMonths = useMemo(
+    () => trendsData?.months?.map((m) => m.month) ?? [],
+    [trendsData]
+  );
 
   // fallback current month if trends missing
   const now = new Date();
-  const currentIsoMonth = `${now.getUTCFullYear()}-${String(
-    now.getUTCMonth() + 1
-  ).padStart(2, "0")}`;
+  const currentIsoMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
 
   // selected month used by the "Spending by Category" chart
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
@@ -85,23 +67,25 @@ export function ReportsPage() {
         ? trendsData.months[trendsData.months.length - 1].month
         : currentIsoMonth;
     setSelectedMonth(latest);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trendsData]);
 
   // trends chart data (map months -> labels & totals)
-  const trendChartData =
-    trendsData?.months?.map((m) => ({
-      name: monthLabel(m.month),
-      usd: m.totalUSD ?? 0,
-      ngn: m.totalNGN ?? 0,
-    })) ?? [];
+  const trendChartData = useMemo(() => {
+    return (
+      trendsData?.months?.map((m) => ({
+        name: monthLabel(m.month),
+        usd: m.totalUSD ?? 0,
+        ngn: m.totalNGN ?? 0,
+      })) ?? []
+    );
+  }, [trendsData]);
 
   // determine date range for the selected month (fallback to current)
   const selMonth =
     selectedMonth ??
     availableMonths[availableMonths.length - 1] ??
     currentIsoMonth;
-  const [from, to] = monthToRange(selMonth);
+  const [from, to] = useMemo(() => monthToRange(selMonth), [selMonth]);
 
   // category report for selected month
   const { data: categoryResp, isLoading: categoryLoading } = useCategoryReport(
@@ -110,14 +94,17 @@ export function ReportsPage() {
   );
 
   // by-category chart data
-  const byCategoryData =
-    categoryResp?.byCategory?.map((r, i) => ({
-      name: r.category,
-      totalUSD: r.totalUSD ?? 0,
-      totalNGN: r.totalNGN ?? 0,
-      totalAll: (r.totalUSD ?? 0) + (r.totalNGN ?? 0),
-      color: `var(--chart-${(i % 5) + 1})`,
-    })) ?? [];
+  const byCategoryData = useMemo(() => {
+    return (
+      categoryResp?.byCategory?.map((r, i) => ({
+        name: r.category,
+        totalUSD: r.totalUSD ?? 0,
+        totalNGN: r.totalNGN ?? 0,
+        totalAll: (r.totalUSD ?? 0) + (r.totalNGN ?? 0),
+        color: `var(--chart-${(i % 5) + 1})`,
+      })) ?? []
+    );
+  }, [categoryResp]);
 
   // export mutation (shows toast via hook)
   const exportMutation = useExportExpenses();
@@ -130,73 +117,10 @@ export function ReportsPage() {
 
   const handleDownload = async () => {
     try {
-      // use selected month range for export
       const resp = await exportMutation.mutateAsync({ from, to });
-
-      const respData = (resp as any)?.data ?? resp;
-      const headers = (resp as any)?.headers ?? {};
-
-      let blob: Blob;
-      if (respData instanceof Blob) {
-        blob = respData;
-      } else if (
-        respData &&
-        typeof respData === "object" &&
-        respData.constructor?.name === "ArrayBuffer"
-      ) {
-        blob = new Blob([respData], {
-          type: headers["content-type"] ?? "text/csv",
-        });
-      } else if (typeof respData === "string") {
-        blob = new Blob([respData], {
-          type: headers["content-type"] ?? "text/csv",
-        });
-      } else {
-        blob = new Blob([JSON.stringify(respData)], {
-          type: "application/json",
-        });
-      }
-
-      const url = window.URL.createObjectURL(blob);
-
-      const disp =
-        headers["content-disposition"] ||
-        headers["Content-Disposition"] ||
-        undefined;
-
-      let fileName = fallbackFileName(from, to);
-      if (typeof disp === "string") {
-        const m = disp.match(/filename="(.+)"/);
-        if (m && m[1]) fileName = m[1];
-        else {
-          const m2 = disp.match(/filename\*=UTF-8''(.+)/i);
-          if (m2 && m2[1]) fileName = decodeURIComponent(m2[1]);
-        }
-      }
-
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
+      await downloadResponseAsFile(resp as any, fallbackFileName(from, to));
     } catch (err: any) {
       console.error("Export failed", err);
-      if (err?.response?.data) {
-        try {
-          const d = err.response.data;
-          if (d instanceof Blob) {
-            const text = await d.text();
-            console.error("Server error body:", text);
-          } else {
-            console.error("Server error body:", d);
-          }
-        } catch (e) {
-          // ignore
-        }
-      }
-      // export hook already shows error toast via onError
     }
   };
 
@@ -325,7 +249,6 @@ export function ReportsPage() {
                 onChange={(e) => setSelectedMonth(e.target.value)}
                 className="h-9 rounded-md border border-border/20 bg-background/60 px-2 text-sm"
               >
-                {/* prefer availableMonths, fallback to currentIsoMonth */}
                 {(availableMonths.length
                   ? availableMonths
                   : [currentIsoMonth]
@@ -373,9 +296,7 @@ export function ReportsPage() {
                       border: "1px solid rgba(255,255,255,0.1)",
                       borderRadius: "12px",
                     }}
-                    formatter={(value: any, name: any, props: any) => {
-                      return [value, name];
-                    }}
+                    formatter={(value: any, name: any) => [value, name]}
                   />
                   <Bar dataKey="totalAll" radius={[0, 4, 4, 0]} barSize={20}>
                     {byCategoryData.map((entry, idx) => (

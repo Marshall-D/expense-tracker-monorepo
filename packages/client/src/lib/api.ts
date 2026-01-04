@@ -1,4 +1,11 @@
-// packages/client/src/lib/api.ts
+/**
+ * packages/client/src/lib/api.ts
+ *
+ * Lightweight axios wrapper with:
+ * - automatic Authorization header when token exists
+ * - central 401 handling (clear auth state + redirect to login when appropriate)
+ *
+ */
 
 import axios from "axios";
 import { getToken, removeToken, removeUser } from "./storage";
@@ -25,20 +32,15 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// handle 401 globally (best-effort). We cannot import React router here, so do a safe fallback:
+// handle 401 globally '
 api.interceptors.response.use(
   (res) => res,
   (err) => {
     const status = err?.response?.status;
     if (status === 401) {
-      // clear local auth state — AuthProvider will rehydrate from storage on next load
       removeToken();
       removeUser();
 
-      // Decide whether to perform a hard redirect to the login page.
-      // We SHOULD NOT redirect if the failing request is itself the login/auth endpoint
-      // (because that would cause the login page to reload on invalid credentials).
-      // Also avoid redirecting if we're already on the login page.
       try {
         const reqUrl =
           (err && err.config && (err.config.url || err.config.baseURL || "")) ||
@@ -47,7 +49,6 @@ api.interceptors.response.use(
         const isAuthEndpoint =
           String(reqUrl).includes("/api/auth") ||
           String(reqUrl).includes("/auth") ||
-          // also allow for common paths; tweak if your auth route is different
           false;
 
         const alreadyOnLogin =

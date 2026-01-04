@@ -35,31 +35,35 @@ import {
   downloadResponseAsFile,
 } from "@/lib";
 
-/**
- * Reports page: visualize trends and by-category breakdowns.
- */
+/** small responsive helper used locally */
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState<boolean>(() =>
+    typeof window === "undefined" ? false : window.innerWidth < breakpoint
+  );
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia(`(max-width: ${breakpoint}px)`);
+    const handler = () => setIsMobile(mq.matches);
+    handler();
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, [breakpoint]);
+  return isMobile;
+}
 
 export function ReportsPage() {
-  // trends window: fixed to last 6 months
   const monthsAgo = 6;
-
-  // fetch trends for last N months
   const { data: trendsData, isLoading: trendsLoading } = useTrends(monthsAgo);
 
-  // build available months list (oldest -> newest) from trends
   const availableMonths = useMemo(
     () => trendsData?.months?.map((m) => m.month) ?? [],
     [trendsData]
   );
 
-  // fallback current month if trends missing
   const now = new Date();
   const currentIsoMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
 
-  // selected month used by the "Spending by Category" chart
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
-
-  // initialize selectedMonth to latest month when trends arrive
   useEffect(() => {
     if (selectedMonth) return;
     const latest =
@@ -67,9 +71,9 @@ export function ReportsPage() {
         ? trendsData.months[trendsData.months.length - 1].month
         : currentIsoMonth;
     setSelectedMonth(latest);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trendsData]);
 
-  // trends chart data (map months -> labels & totals)
   const trendChartData = useMemo(() => {
     return (
       trendsData?.months?.map((m) => ({
@@ -80,20 +84,17 @@ export function ReportsPage() {
     );
   }, [trendsData]);
 
-  // determine date range for the selected month (fallback to current)
   const selMonth =
     selectedMonth ??
     availableMonths[availableMonths.length - 1] ??
     currentIsoMonth;
   const [from, to] = useMemo(() => monthToRange(selMonth), [selMonth]);
 
-  // category report for selected month
   const { data: categoryResp, isLoading: categoryLoading } = useCategoryReport(
     from,
     to
   );
 
-  // by-category chart data
   const byCategoryData = useMemo(() => {
     return (
       categoryResp?.byCategory?.map((r, i) => ({
@@ -106,11 +107,9 @@ export function ReportsPage() {
     );
   }, [categoryResp]);
 
-  // export mutation (shows toast via hook)
   const exportMutation = useExportExpenses();
   const isExporting = exportMutation.status === "pending";
 
-  // helper fallback filename
   function fallbackFileName(fromStr: string, toStr: string) {
     return `expenses_${fromStr}_${toStr}.csv`;
   }
@@ -124,8 +123,11 @@ export function ReportsPage() {
     }
   };
 
+  const isMobile = useIsMobile(768);
+  const axisTickColor = "oklch(0.7 0.01 260)";
+
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-24 md:pb-0">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
@@ -194,12 +196,12 @@ export function ReportsPage() {
                     dataKey="name"
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fill: "oklch(0.7 0.01 260)", fontSize: 12 }}
+                    tick={{ fill: axisTickColor, fontSize: 12 }}
                   />
                   <YAxis
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fill: "oklch(0.7 0.01 260)", fontSize: 12 }}
+                    tick={{ fill: axisTickColor, fontSize: 12 }}
                   />
                   <Tooltip
                     contentStyle={{
@@ -232,36 +234,70 @@ export function ReportsPage() {
         </Card>
 
         <Card className="col-span-3 border-border/40 bg-card/40">
-          <CardHeader className="flex items-start justify-between gap-4">
-            <div>
-              <CardTitle>Spending by Category</CardTitle>
-              <CardDescription>
-                Top categories for{" "}
-                <span className="font-medium">{monthLabel(selMonth)}</span>
-              </CardDescription>
+          <CardHeader>
+            {/* MOBILE: stacked header  */}
+            <div className="sm:hidden w-full space-y-2">
+              <div>
+                <CardTitle>Spending by Category</CardTitle>
+              </div>
+              <div>
+                <CardDescription>
+                  Top categories for{" "}
+                  <span className="font-medium">{monthLabel(selMonth)}</span>
+                </CardDescription>
+              </div>
+              <div>
+                <select
+                  aria-label="Select month"
+                  value={selMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="h-9 rounded-md border border-border/20 bg-background/60 px-2 text-sm w-full"
+                >
+                  {(availableMonths.length
+                    ? availableMonths
+                    : [currentIsoMonth]
+                  ).map((m) => (
+                    <option key={m} value={m}>
+                      {monthShort(m)}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            {/* Month selector inside the card (uses months from trends) */}
-            <div className="ml-auto">
-              <select
-                aria-label="Select month"
-                value={selMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="h-9 rounded-md border border-border/20 bg-background/60 px-2 text-sm"
-              >
-                {(availableMonths.length
-                  ? availableMonths
-                  : [currentIsoMonth]
-                ).map((m) => (
-                  <option key={m} value={m}>
-                    {monthShort(m)}
-                  </option>
-                ))}
-              </select>
+            {/* TABLET/DESKTOP */}
+            <div className="hidden sm:flex items-start justify-between w-full">
+              <div>
+                <CardTitle>Spending by Category</CardTitle>
+                <CardDescription>
+                  Top categories for{" "}
+                  <span className="font-medium">{monthLabel(selMonth)}</span>
+                </CardDescription>
+              </div>
+
+              <div className="ml-auto">
+                <select
+                  aria-label="Select month"
+                  value={selMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="h-9 rounded-md border border-border/20 bg-background/60 px-2 text-sm"
+                >
+                  {(availableMonths.length
+                    ? availableMonths
+                    : [currentIsoMonth]
+                  ).map((m) => (
+                    <option key={m} value={m}>
+                      {monthShort(m)}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </CardHeader>
 
-          <CardContent className="h-[350px]">
+          <CardContent
+            className={`h-[420px] md:h-[350px] ${isMobile ? "pb-24" : ""}`}
+          >
             {categoryLoading ? (
               <div className="p-6">Loading categories…</div>
             ) : byCategoryData.length === 0 ? (
@@ -283,11 +319,11 @@ export function ReportsPage() {
                     axisLine={false}
                     tickLine={false}
                     tick={{
-                      fill: "oklch(0.95 0.01 260)",
+                      fill: axisTickColor,
                       fontSize: 12,
                       fontWeight: 500,
                     }}
-                    width={140}
+                    width={isMobile ? 120 : 140}
                   />
                   <Tooltip
                     cursor={{ fill: "rgba(255,255,255,0.05)" }}

@@ -5,11 +5,6 @@ import * as categoryService from "@/services";
 import { queryKeys } from "@/lib";
 import { Category } from "@/types/categories";
 
-/**
- * useCategories
- * - Object-form useQuery to avoid TS overload issues
- * - Explicit generic for Category[] result
- */
 export const useCategories = (includeGlobal = true) =>
   useQuery<Category[]>({
     queryKey: [queryKeys.categories, { includeGlobal }],

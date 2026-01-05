@@ -30,3 +30,5 @@ export {
 export { useDashboardData } from "./useDashboardData";
 
 export { useExpensesPage } from "./useExpensesPage";
+
+export { useCategoryActions } from "./useCategoryActions";

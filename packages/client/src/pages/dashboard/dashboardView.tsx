@@ -165,53 +165,56 @@ export function DashboardView({ data }: Props) {
             </CardDescription>
           </CardHeader>
           <CardContent className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={monthlyData.map((d) => ({
-                  ...d,
-                  monthLabel: monthLabel(d.month),
-                }))}
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  vertical={false}
-                  stroke="rgba(255,255,255,0.05)"
-                />
-                <XAxis
-                  dataKey="monthLabel"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: "oklch(0.7 0.01 260)", fontSize: 12 }}
-                />
-                <YAxis
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: "oklch(0.7 0.01 260)", fontSize: 12 }}
-                />
-                <Tooltip
-                  formatter={(value) => ngnFormatter(value)}
-                  contentStyle={{
-                    backgroundColor: "oklch(0.22 0.02 260)",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    borderRadius: "12px",
-                  }}
-                  itemStyle={{ color: "oklch(0.95 0.01 260)" }}
-                />
-                <Bar
-                  dataKey="amount"
-                  fill="var(--color-brand-gold)"
-                  radius={[4, 4, 0, 0]}
+            {data.trendsLoading ? (
+              <div className="p-6">Loading trends…</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={monthlyData.map((d) => ({
+                    ...d,
+                    monthLabel: monthLabel(d.month),
+                  }))}
                 >
-                  {monthlyData.map((entry, idx) => (
-                    <Cell key={`m-${idx}`} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    vertical={false}
+                    stroke="rgba(255,255,255,0.05)"
+                  />
+                  <XAxis
+                    dataKey="monthLabel"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: "oklch(0.7 0.01 260)", fontSize: 12 }}
+                  />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: "oklch(0.7 0.01 260)", fontSize: 12 }}
+                  />
+                  <Tooltip
+                    formatter={(value) => ngnFormatter(value)}
+                    contentStyle={{
+                      backgroundColor: "oklch(0.22 0.02 260)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: "12px",
+                    }}
+                    itemStyle={{ color: "oklch(0.95 0.01 260)" }}
+                  />
+                  <Bar
+                    dataKey="amount"
+                    fill="var(--color-brand-gold)"
+                    radius={[4, 4, 0, 0]}
+                  >
+                    {monthlyData.map((entry, idx) => (
+                      <Cell key={`m-${idx}`} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
-        {/* Category distribution — add mobile bottom padding so chart isn't covered by nav */}
         <Card className="col-span-3 border-border/40 bg-card/40">
           <CardHeader className="flex items-start justify-between gap-4">
             <div>
@@ -238,68 +241,70 @@ export function DashboardView({ data }: Props) {
             </div>
           </CardHeader>
 
-          {/* IMPORTANT: pb-24 prevents mobile bottom nav from covering chart.
-              You can tweak this value to match your app's bottom nav height. */}
           <CardContent className="pb-24 lg:pb-0">
-            <div className="flex flex-col">
-              <div className="h-[220px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={categoryData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={56}
-                      outerRadius={80}
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
-                      {categoryData.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={entry.color}
-                          stroke="none"
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(value) => ngnFormatter(value)}
-                      contentStyle={{
-                        backgroundColor: "oklch(0.22 0.02 260)",
-                        border: "1px solid rgba(255,255,255,0.1)",
-                        borderRadius: "12px",
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="mt-4 px-4">
-                <div className="max-h-36 overflow-auto">
-                  <div className="grid grid-cols-1 gap-2">
-                    {categoryData.map((item) => (
-                      <div
-                        key={item.name}
-                        className="flex items-center justify-between gap-4"
+            {data.categoryLoading ? (
+              <div className="p-6">Loading categories…</div>
+            ) : (
+              <div className="flex flex-col">
+                <div className="h-[220px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={categoryData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={56}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
                       >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: item.color }}
+                        {categoryData.map((entry, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={entry.color}
+                            stroke="none"
                           />
-                          <div className="text-sm text-muted-foreground">
-                            {item.name}
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(value) => ngnFormatter(value)}
+                        contentStyle={{
+                          backgroundColor: "oklch(0.22 0.02 260)",
+                          border: "1px solid rgba(255,255,255,0.1)",
+                          borderRadius: "12px",
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+
+                <div className="mt-4 px-4">
+                  <div className="max-h-36 overflow-auto">
+                    <div className="grid grid-cols-1 gap-2">
+                      {categoryData.map((item) => (
+                        <div
+                          key={item.name}
+                          className="flex items-center justify-between gap-4"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: item.color }}
+                            />
+                            <div className="text-sm text-muted-foreground">
+                              {item.name}
+                            </div>
+                          </div>
+                          <div className="text-sm font-medium">
+                            {formatNGN(item.value)}
                           </div>
                         </div>
-                        <div className="text-sm font-medium">
-                          {formatNGN(item.value)}
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>

@@ -29,9 +29,7 @@ export function CategoryForm({
 
   const nameRef = useRef<HTMLInputElement | null>(null);
 
-  // If editing a global category, do not allow changing it in the UI (server will also prevent)
   const isGlobal = initial?.type === "Global";
-  // inside CategoryForm.tsx (only the handle function changed)
   const handle = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -51,9 +49,7 @@ export function CategoryForm({
 
     setLoading(true);
     try {
-      // IMPORTANT: do NOT show toasts here. Delegate success toast to parent.
       await onSubmit({ name: trimmed, color });
-      // leave success handling to the parent (which performs the API call).
     } catch (err: any) {
       // err is expected to be the normalized error object from the service
       const friendly =

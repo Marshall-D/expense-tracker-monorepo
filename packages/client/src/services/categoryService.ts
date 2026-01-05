@@ -2,10 +2,6 @@
 import { api } from "@/lib";
 import { Category } from "@/types/categories";
 
-/**
- * Normalizes axios / fetch errors into a predictable shape:
- * { message, status?, code?, friendlyMessage?, field? , originalError }
- */
 function normalizeApiError(err: any) {
   const out: any = {
     message: err?.message ?? "Request failed",

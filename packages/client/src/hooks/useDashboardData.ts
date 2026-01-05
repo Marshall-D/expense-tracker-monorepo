@@ -244,5 +244,5 @@ export function useDashboardData(monthsAgo = 6): DashboardData {
 
     formatNGN,
     formatNGNWithDecimals,
-  } as unknown as DashboardData;
+  } as DashboardData;
 }

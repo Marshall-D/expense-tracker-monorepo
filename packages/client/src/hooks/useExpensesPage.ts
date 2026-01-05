@@ -15,6 +15,7 @@
 import { useMemo, useEffect, useState, useCallback } from "react";
 import { format } from "date-fns";
 import { useSearchParams } from "react-router-dom";
+
 import {
   useExpenses,
   useDeleteExpense,
@@ -65,7 +66,7 @@ export function useExpensesPage() {
   // keep searchTerm in sync if URL changed externally
   useEffect(() => {
     setSearchTerm(initialQ);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [initialQ]);
 
   // Reset page to 1 whenever filters/search change
@@ -126,7 +127,7 @@ export function useExpensesPage() {
     if (appliedTo) qs.set("to", appliedTo);
     if (page && page > 1) qs.set("page", String(page));
     setSearchParams(qs, { replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [debouncedSearch, appliedCategoryIds, appliedFrom, appliedTo, page]);
 
   // helpers

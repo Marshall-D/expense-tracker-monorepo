@@ -7,6 +7,7 @@
  * - Renders the pure LoginView component
  */
 import React from "react";
+
 import { LoginView } from "./loginView";
 import { useLoginHandler } from "@/hooks";
 

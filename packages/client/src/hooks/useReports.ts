@@ -1,7 +1,8 @@
 // packages/client/src/hooks/useReports.ts
 import { useQuery, useMutation } from "@tanstack/react-query";
-import * as reportService from "@/services";
 import { keepPreviousData } from "@tanstack/react-query";
+
+import * as reportService from "@/services";
 import { queryKeys, t } from "@/lib";
 import type {
   TrendsResponse,

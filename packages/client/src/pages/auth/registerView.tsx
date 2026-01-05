@@ -2,6 +2,8 @@
 
 import React from "react";
 import { Link } from "react-router-dom";
+import { Wallet } from "lucide-react";
+
 import {
   Button,
   Input,
@@ -13,7 +15,6 @@ import {
   CardContent,
   CardFooter,
 } from "@/components";
-import { Wallet } from "lucide-react";
 import { ROUTES } from "@/utils";
 
 type Props = {

@@ -1,6 +1,7 @@
 // packages/client/src/pages/expenses/ExpenseEditorPage.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+
 import { ROUTES } from "@/utils";
 import type { ExpenseCreatePayload, Expense } from "@/types";
 import { Button, InfoModal } from "@/components";
@@ -25,8 +26,6 @@ export function ExpenseEditorPage(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const loading = isNew ? false : expenseQuery.isLoading;
 
-  const isCreating = createMutation.status === "pending";
-  const isUpdating = updateMutation.status === "pending";
   const isDeleting = deleteMutation.status === "pending";
 
   const [confirmOpen, setConfirmOpen] = useState(false);

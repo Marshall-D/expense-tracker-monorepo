@@ -8,6 +8,7 @@
  */
 
 import axios from "axios";
+
 import { getToken, removeToken, removeUser } from "./storage";
 import { ROUTES } from "@/utils";
 
@@ -68,13 +69,8 @@ api.interceptors.response.use(
             }
           }
         } else {
-          // If this was an auth endpoint (e.g. login failed) or we're already on /login,
-          // do not navigate — let the calling screen handle the error and show toasts.
-          // We still cleared token/user above so state is consistent.
         }
-      } catch (inner) {
-        // Fallback: don't crash; we've already removed tokens above.
-      }
+      } catch (inner) {}
     }
     return Promise.reject(err);
   }

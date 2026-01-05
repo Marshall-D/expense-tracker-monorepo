@@ -1,6 +1,7 @@
 // packages/client/src/components/ui/infoModal.tsx
 
 import React from "react";
+
 import { Button } from "@/components";
 
 /**

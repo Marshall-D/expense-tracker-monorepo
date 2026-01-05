@@ -9,6 +9,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Plus } from "lucide-react";
+
 import { ROUTES } from "@/utils";
 import { InfoModal, BudgetCard, Button } from "@/components";
 import type { Budget } from "@/types";

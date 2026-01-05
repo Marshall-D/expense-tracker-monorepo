@@ -11,6 +11,7 @@
 
 import React from "react";
 import { Link } from "react-router-dom";
+import { Pencil, Trash2, Wallet, AlertCircle } from "lucide-react";
 
 import {
   Button,
@@ -20,7 +21,6 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components";
-import { Pencil, Trash2, Wallet, AlertCircle } from "lucide-react";
 import { ROUTES } from "@/utils";
 import type { Budget } from "@/types";
 import { useBudgetSpending } from "@/hooks";

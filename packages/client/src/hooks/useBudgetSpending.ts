@@ -1,6 +1,7 @@
 // packages/client/src/hooks/useBudgetSpending.ts
 
 import { useQuery } from "@tanstack/react-query";
+
 import * as expensesService from "@/services";
 import { queryKeys } from "@/lib";
 

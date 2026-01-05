@@ -1,6 +1,7 @@
 // packages/client/src/pages/categories/categories.tsx
 import React from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+
 import { ROUTES } from "@/utils";
 import { useCategories, useCategoryActions } from "@/hooks";
 import { InfoModal } from "@/components";

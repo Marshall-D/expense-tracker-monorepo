@@ -8,6 +8,7 @@
  */
 
 import React from "react";
+
 import { RegisterView } from "./registerView";
 import { useRegisterHandler } from "@/hooks";
 

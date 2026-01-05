@@ -5,6 +5,7 @@
  */
 
 import React from "react";
+
 import { DashboardView } from "./dashboardView";
 import { useDashboardData } from "@/hooks";
 

@@ -1,11 +1,12 @@
 // packages/client/src/pages/categories/CategoryEditorPage.tsx
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+
 import { ROUTES } from "@/utils";
 import type { Category } from "@/types/categories";
 import { Button, InfoModal } from "@/components";
 import * as categoryService from "@/services";
-import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys, t } from "@/lib";
 import { CategoryForm } from "./categoryForm";
 

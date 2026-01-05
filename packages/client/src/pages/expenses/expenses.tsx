@@ -1,5 +1,6 @@
 // packages/client/src/pages/expenses/expenses.tsx
 import React, { Suspense } from "react";
+
 import { ExpensesView } from "./expensesView";
 import { useExpensesPage } from "@/hooks";
 

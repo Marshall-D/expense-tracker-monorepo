@@ -2,10 +2,9 @@
 
 import React from "react";
 import { Routes, Route } from "react-router-dom";
+
 import { ROUTES } from "@/utils";
-
 import { LoginPage, RegisterPage } from "@/pages/auth";
-
 import { ExpensesPageWrapper, ExpenseEditorPage } from "@/pages/expenses";
 import { BudgetsPage, BudgetEditorPage } from "@/pages/budgets/";
 import { CategoriesPage, CategoryEditorPage } from "@/pages/categories";

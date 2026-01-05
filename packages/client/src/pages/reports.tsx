@@ -4,7 +4,6 @@
  */
 
 import React, { useMemo, useState, useEffect } from "react";
-
 import {
   AreaChart,
   Area,
@@ -18,6 +17,7 @@ import {
   Cell,
 } from "recharts";
 import { Download } from "lucide-react";
+
 import {
   Button,
   Card,
@@ -27,7 +27,6 @@ import {
   CardDescription,
 } from "@/components";
 import { useTrends, useCategoryReport, useExportExpenses } from "@/hooks";
-
 import {
   monthLabel,
   monthShort,
@@ -71,7 +70,7 @@ export function ReportsPage() {
         ? trendsData.months[trendsData.months.length - 1].month
         : currentIsoMonth;
     setSelectedMonth(latest);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [trendsData]);
 
   const trendChartData = useMemo(() => {

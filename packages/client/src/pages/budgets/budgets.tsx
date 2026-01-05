@@ -5,6 +5,7 @@
  */
 
 import React from "react";
+
 import { useBudgetsData } from "@/hooks";
 import { BudgetsView } from "./budgetsView";
 

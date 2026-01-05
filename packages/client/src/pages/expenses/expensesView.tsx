@@ -8,6 +8,16 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import {
+  Search,
+  Filter,
+  Plus,
+  Pencil,
+  Trash2,
+  Download,
+  X,
+} from "lucide-react";
+
+import {
   Badge,
   InfoModal,
   Table,
@@ -22,17 +32,7 @@ import {
   TableRow,
   Button,
 } from "@/components";
-import {
-  Search,
-  Filter,
-  Plus,
-  Pencil,
-  Trash2,
-  Download,
-  X,
-} from "lucide-react";
 import { ROUTES } from "@/utils";
-import { format } from "date-fns";
 
 export function ExpensesView(props: any) {
   const {
@@ -50,20 +50,14 @@ export function ExpensesView(props: any) {
     setWorkingFrom,
     workingTo,
     setWorkingTo,
-    appliedCategoryIds,
-    appliedFrom,
-    appliedTo,
 
     drawerOpen,
     setDrawerOpen,
     dateRangeInvalid,
 
-    page,
     setPage,
-    limit,
     total,
     currentPage,
-    currentLimit,
     startIndex,
     endIndex,
     hasPrev,
@@ -73,9 +67,7 @@ export function ExpensesView(props: any) {
     setDeleteModalOpen,
     requestDelete,
     performDelete,
-    deleteTargetId,
 
-    toggleCategory,
     handleApply,
     handleClear,
 
@@ -83,20 +75,7 @@ export function ExpensesView(props: any) {
     isExporting,
 
     isDeleting,
-
-    categoriesLoading,
-    categoriesError,
-    refetchCategories,
   } = props;
-
-  // Small helpers (local)
-  const defaultRange = () => {
-    const today = new Date();
-    const to = format(today, "yyyy-MM-dd");
-    const fromDate = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000);
-    const from = format(fromDate, "yyyy-MM-dd");
-    return { from, to };
-  };
 
   // Filter panel (re-used)
   const FilterPanel = (

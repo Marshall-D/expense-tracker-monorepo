@@ -7,13 +7,6 @@
 
 import React from "react";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components";
-import {
   BarChart,
   Bar,
   XAxis,
@@ -33,6 +26,13 @@ import {
   ArrowDownRight,
 } from "lucide-react";
 
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components";
 import { monthLabel, monthShort } from "@/lib";
 import type { DashboardData } from "@/types";
 

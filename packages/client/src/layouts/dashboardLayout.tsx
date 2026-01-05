@@ -1,7 +1,6 @@
 // packages/client/src/layouts/dashboardLayout.tsx
 import React, { useState, useEffect } from "react";
 import { NavLink, Link, Outlet } from "react-router-dom";
-import { ROUTES } from "@/utils";
 import {
   Wallet,
   LayoutDashboard,
@@ -12,9 +11,11 @@ import {
   Menu,
   X,
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+
+import { ROUTES } from "@/utils";
 import { Button } from "@/components";
 import { useAuth } from "@/context";
-import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib";
 import * as categoryService from "@/services";
 
@@ -73,7 +74,7 @@ export function DashboardLayout(): JSX.Element {
       queryFn: () => categoryService.fetchCategories(true),
     }).catch(() => {});
     // run on mount only
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, []);
 
   return (

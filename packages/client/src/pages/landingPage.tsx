@@ -2,8 +2,9 @@
 
 import React from "react";
 import { Link } from "react-router-dom";
-import { Button, Card, CardContent } from "@/components";
 import { ArrowRight, Wallet, PieChart, ShieldCheck } from "lucide-react";
+
+import { Button, Card, CardContent } from "@/components";
 import { ROUTES } from "@/utils";
 
 export function LandingPage(): JSX.Element {

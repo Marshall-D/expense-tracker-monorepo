@@ -1,6 +1,7 @@
 // packages/client/src/pages/categories/CategoriesList.tsx
 import React, { KeyboardEvent } from "react";
 import { Plus, Tags, Trash2 } from "lucide-react";
+
 import { ROUTES } from "@/utils";
 import { Card, CardContent, CardHeader, Button, Badge } from "@/components";
 import type { Category } from "@/types/";

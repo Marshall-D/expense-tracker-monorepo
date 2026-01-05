@@ -8,6 +8,7 @@ import React, {
   useState,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+
 import {
   getToken,
   getUser,
@@ -18,7 +19,6 @@ import {
   queryKeys,
 } from "@/lib";
 import { ROUTES } from "@/utils";
-
 import { User, AuthContextValue } from "@/types";
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);

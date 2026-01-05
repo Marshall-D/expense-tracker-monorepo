@@ -5,6 +5,7 @@ import {
   useQueryClient,
   keepPreviousData,
 } from "@tanstack/react-query";
+
 import * as expensesService from "@/services";
 import { queryKeys, t } from "@/lib";
 import type {
@@ -104,7 +105,7 @@ export const useCreateExpense = () => {
       t.error(err?.message ?? "Failed to add expense");
     },
 
-    onSuccess: (data, variables, context) => {
+    onSuccess: () => {
       // server returned id; invalidate to sync and show success toast
       qc.invalidateQueries({ queryKey: [queryKeys.expenses] });
       t.success("Expense added");

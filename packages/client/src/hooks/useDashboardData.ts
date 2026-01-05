@@ -7,6 +7,7 @@
  */
 
 import { useMemo, useEffect, useState } from "react";
+
 import {
   useTrends,
   useCategoryReport,
@@ -58,7 +59,7 @@ export function useDashboardData(monthsAgo = 6): DashboardData {
         ? trendsData.months[trendsData.months.length - 1].month
         : currentIsoMonth;
     setSelectedMonth(latest);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [trendsData]);
 
   const selectorMonths = useMemo(

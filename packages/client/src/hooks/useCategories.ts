@@ -1,6 +1,7 @@
 // packages/client/src/hooks/useCategories.ts
 
 import { useQuery } from "@tanstack/react-query";
+
 import * as categoryService from "@/services";
 import { queryKeys } from "@/lib";
 import { Category } from "@/types/categories";

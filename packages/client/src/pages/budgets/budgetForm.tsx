@@ -72,7 +72,6 @@ export function BudgetForm({
         ? String(initial.periodStart).slice(0, 7)
         : defaultMonth
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initial]);
 
   const handle = async (e: React.FormEvent) => {

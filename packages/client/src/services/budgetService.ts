@@ -3,10 +3,6 @@
 import { api } from "@/lib";
 import type { Budget, BudgetCreatePayload, BudgetUpdatePayload } from "@/types";
 
-/**
- * Fetch list of budgets
- */
-
 export const fetchBudgets = async (params?: {
   periodStart?: string;
   categoryId?: string;

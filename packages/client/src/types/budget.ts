@@ -48,3 +48,22 @@ export type BudgetUpdatePayload = Partial<{
   periodStart: string;
   amount: number;
 }>;
+
+/** Small shape returned to the view */
+export type UseBudgetsDataResult = {
+  budgets: Budget[];
+  isLoading: boolean;
+  isError: boolean;
+
+  // deletion modal state
+  deleteModalOpen: boolean;
+  deleteTarget: { id: string; category: string } | null;
+
+  // actions
+  requestDelete: (id: string, category: string) => void;
+  cancelDelete: () => void;
+  confirmDelete: () => Promise<void>;
+
+  // mutation state
+  isDeleting: boolean;
+};

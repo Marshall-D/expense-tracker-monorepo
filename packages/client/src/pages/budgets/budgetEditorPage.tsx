@@ -15,7 +15,7 @@ import { BudgetForm } from "./budgetForm";
 import { t } from "@/lib";
 
 export function BudgetEditorPage(): JSX.Element {
-  const { id } = useParams(); // id comes from route /dashboard/budgets/:id
+  const { id } = useParams();
   const isNew = !id;
   const navigate = useNavigate();
 
@@ -26,15 +26,12 @@ export function BudgetEditorPage(): JSX.Element {
 
   const [error, setError] = useState<string | null>(null);
 
-  // loading follows same logic as ExpenseEditorPage: only loading when editing
   const loading = isNew ? false : budgetQuery.isLoading;
 
-  // derive booleans using status (type-safe)
   const isCreating = createMutation.status === "pending";
   const isUpdating = updateMutation.status === "pending";
   const isDeleting = deleteMutation.status === "pending";
 
-  // map fetched budget to initial form shape (Partial<Budget>)
   const initial = useMemo<Partial<Budget> | undefined>(() => {
     if (!budgetQuery.data) return undefined;
     const b = budgetQuery.data;
@@ -57,7 +54,6 @@ export function BudgetEditorPage(): JSX.Element {
     setError(null);
     try {
       if (isNew) {
-        // build create payload matching service type
         const createPayload: any = {
           amount: payload.amount,
           periodStart: payload.periodStart as unknown as string,
@@ -65,7 +61,6 @@ export function BudgetEditorPage(): JSX.Element {
         if (payload.categoryId !== undefined && payload.categoryId !== "") {
           createPayload.categoryId = payload.categoryId;
         } else if (payload.category) {
-          // allow creating with a category name fallback
           createPayload.category = payload.category;
         }
         await createMutation.mutateAsync(createPayload);
@@ -73,13 +68,11 @@ export function BudgetEditorPage(): JSX.Element {
       } else {
         if (!id) throw new Error("Missing id");
 
-        // build update payload with strict typing:
         const updatePayload: any = {};
         if (typeof payload.amount !== "undefined")
           updatePayload.amount = payload.amount;
 
         if (typeof payload.categoryId !== "undefined") {
-          // empty string means "no category" from the form — convert to null for server
           updatePayload.categoryId =
             payload.categoryId === "" ? null : payload.categoryId;
         } else if (
@@ -97,7 +90,6 @@ export function BudgetEditorPage(): JSX.Element {
         t.success("Budget updated");
       }
 
-      // optimistic updates handled in hooks; navigate to list
       navigate(ROUTES.BUDGETS);
     } catch (err: any) {
       const msg = err?.message ?? "Save failed";

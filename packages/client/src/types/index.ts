@@ -13,6 +13,7 @@ export type {
   Budget,
   BudgetCreatePayload,
   BudgetUpdatePayload,
+  UseBudgetsDataResult,
 } from "./budget";
 
 export type { Category } from "./categories";

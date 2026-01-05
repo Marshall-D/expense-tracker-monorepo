@@ -28,3 +28,5 @@ export {
 } from "./useReports";
 
 export { useDashboardData } from "./useDashboardData";
+
+export { useExpensesPage } from "./useExpensesPage";

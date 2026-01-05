@@ -1,6 +1,5 @@
 // packages/client/src/pages/expenses/ExpenseForm.tsx
 import React, { useEffect, useRef, useState } from "react";
-
 import {
   Card,
   CardContent,
@@ -12,7 +11,6 @@ import {
 } from "@/components";
 import type { Expense, ExpenseCreatePayload } from "@/types";
 import { useCategories } from "@/hooks";
-import { t } from "@/lib";
 
 type Props = {
   initial?: Partial<Expense>;
@@ -30,7 +28,6 @@ export function ExpenseForm({
   const [amount, setAmount] = useState<string>(
     initial.amount?.toString() ?? ""
   );
-  // currency is fixed to NGN and non-editable
   const [currency] = useState<string>("NGN");
   const [description, setDescription] = useState(initial.description ?? "");
   const [categoryId, setCategoryId] = useState<string>(
@@ -49,22 +46,15 @@ export function ExpenseForm({
     refetch: refetchCategories,
   } = useCategories(true);
 
-  // Sync local state when `initial` prop changes, but only if user hasn't interacted yet.
   useEffect(() => {
-    if (!initial || Object.keys(initial).length === 0) {
-      return;
-    }
-    if (touchedRef.current) {
-      return;
-    }
-
+    if (!initial || Object.keys(initial).length === 0) return;
+    if (touchedRef.current) return;
     setAmount(initial.amount?.toString() ?? "");
     setDescription(initial.description ?? "");
     setCategoryId(initial.categoryId ?? "");
     setDate(initial.date ?? new Date().toISOString().slice(0, 10));
   }, [initial]);
 
-  // mark touched when user changes each field
   const onAmountChange = (val: string) => {
     touchedRef.current = true;
     setAmount(val);
@@ -86,28 +76,22 @@ export function ExpenseForm({
     e.preventDefault();
     setError(null);
 
-    // amount validation
     const parsed = Number(amount);
     if (!parsed || parsed <= 0) {
       const msg = "Enter a valid amount greater than 0";
       setError(msg);
-      t.error(msg);
       return;
     }
 
-    // category validation
     if (!categoryId) {
       const msg = "Please select a category";
       setError(msg);
-      t.error(msg);
       return;
     }
 
-    // description validation: required and not empty after trimming
     if (!description || description.trim().length === 0) {
       const msg = "Description is required";
       setError(msg);
-      t.error(msg);
       return;
     }
 
@@ -115,20 +99,17 @@ export function ExpenseForm({
     try {
       const payload: ExpenseCreatePayload = {
         amount: parsed,
-        currency, // guaranteed NGN
+        currency,
         description: description.trim(),
         categoryId,
         date,
       };
+      // let caller (page) / mutation hook handle success toasts
       await onSubmit(payload);
-      // success message: prefer hooks to show it, but add fallback
-      t.success(
-        submitLabel.includes("Add") ? "Expense added" : "Expense saved"
-      );
     } catch (err: any) {
       const msg = err?.message ?? "Failed";
       setError(msg);
-      t.error(msg);
+      // Do not call global toasts here — mutation hooks handle onError
       throw err;
     } finally {
       setLoading(false);
@@ -158,7 +139,6 @@ export function ExpenseForm({
 
             <div>
               <Label htmlFor="currency">Currency</Label>
-              {/* Display currency as readonly text so user cannot change it */}
               <div className="h-10 flex items-center px-3 rounded-md border border-border/20 bg-background/50">
                 <span className="font-medium">NGN</span>
               </div>

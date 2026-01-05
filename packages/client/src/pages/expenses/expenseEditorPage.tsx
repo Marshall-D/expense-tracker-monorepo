@@ -1,5 +1,4 @@
 // packages/client/src/pages/expenses/ExpenseEditorPage.tsx
-
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ROUTES } from "@/utils";
@@ -12,14 +11,12 @@ import {
   useUpdateExpense,
   useDeleteExpense,
 } from "@/hooks";
-import { t } from "@/lib";
 
 export function ExpenseEditorPage(): JSX.Element {
   const { id } = useParams();
   const isNew = !id;
   const navigate = useNavigate();
 
-  // data hooks
   const expenseQuery = useExpense(id);
   const createMutation = useCreateExpense();
   const updateMutation = useUpdateExpense();
@@ -28,15 +25,12 @@ export function ExpenseEditorPage(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const loading = isNew ? false : expenseQuery.isLoading;
 
-  // derive booleans using status (type-safe)
   const isCreating = createMutation.status === "pending";
   const isUpdating = updateMutation.status === "pending";
   const isDeleting = deleteMutation.status === "pending";
 
-  // modal state for delete confirmation
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  // map fetched expense to initial form shape (Partial<Expense>)
   const initial = useMemo<Partial<Expense> | undefined>(() => {
     if (!expenseQuery.data) return undefined;
     const e = expenseQuery.data;
@@ -54,7 +48,7 @@ export function ExpenseEditorPage(): JSX.Element {
     try {
       if (isNew) {
         await createMutation.mutateAsync(payload);
-        // optimistic updates handled in hook; navigate to list
+        // mutation hook shows toast; navigate back
         navigate(ROUTES.EXPENSES);
       } else {
         if (!id) throw new Error("Missing id");
@@ -63,8 +57,8 @@ export function ExpenseEditorPage(): JSX.Element {
       }
     } catch (err: any) {
       const msg = err?.message ?? "Save failed";
+      // show inline error; do NOT call t.error here (hooks handle toasts)
       setError(msg);
-      t.error(msg);
     }
   };
 
@@ -78,7 +72,6 @@ export function ExpenseEditorPage(): JSX.Element {
     } catch (err: any) {
       const msg = err?.message ?? "Delete failed";
       setError(msg);
-      t.error(msg);
     }
   };
 

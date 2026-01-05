@@ -2,3 +2,4 @@
 export { ExpensesPageWrapper } from "./expenses";
 export { ExpenseEditorPage } from "./expenseEditorPage";
 export { ExpenseForm } from "./expenseForm";
+export { ExpensesView } from "./expensesView";

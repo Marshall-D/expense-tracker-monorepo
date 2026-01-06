@@ -196,11 +196,15 @@ Text summary
 - Production secrets stored in AWS SSM; deploy.sh reads them at deploy time.
   Simple diagram
 
+### Architecture
+
+Simple architecture overview (Client ↔ API ↔ MongoDB):
+
 ```mermaid
 flowchart LR
   Client[Client\n(Vite)\nBrowser (VITE_*)] -->|HTTP API| API[API\n(Serverless Lambdas)\nLocal Express (dev)]
   API -->|MongoDB driver| Mongo[(MongoDB)]
-```
+
 
 Key design decision
 
@@ -241,3 +245,4 @@ GET - https://uphk9dlqh2.execute-api.us-east-1.amazonaws.com/api/reports/monthly
 GET - https://uphk9dlqh2.execute-api.us-east-1.amazonaws.com/api/reports/by-category
 GET - https://uphk9dlqh2.execute-api.us-east-1.amazonaws.com/api/reports/trends
 GET - https://uphk9dlqh2.execute-api.us-east-1.amazonaws.com/api/export/expenses
+```

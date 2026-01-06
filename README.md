@@ -202,10 +202,9 @@ Simple architecture overview (Client ↔ API ↔ MongoDB):
 
 ```mermaid
 flowchart LR
-  Client[Client (Vite) - Browser (VITE_*)] -->|HTTP API| API[API - Serverless Lambdas\nLocal Express (dev)]
-  API -->|MongoDB driver| Mongo[MongoDB]
-
-
+  Client["Client<br/>(Vite)<br/>Browser (VITE_*)"] -->|HTTP API| API["API<br/>(Serverless Lambdas)<br/>Local Express (dev)"]
+  API -->|MongoDB driver| Mongo["MongoDB"]
+```
 
 Key design decision
 
@@ -246,4 +245,7 @@ GET - https://uphk9dlqh2.execute-api.us-east-1.amazonaws.com/api/reports/monthly
 GET - https://uphk9dlqh2.execute-api.us-east-1.amazonaws.com/api/reports/by-category
 GET - https://uphk9dlqh2.execute-api.us-east-1.amazonaws.com/api/reports/trends
 GET - https://uphk9dlqh2.execute-api.us-east-1.amazonaws.com/api/export/expenses
+
+```
+
 ```

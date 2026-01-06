@@ -1,9 +1,9 @@
-Readme
+# Full-stack expense tracker (monorepo).
 
-Full-stack expense tracker (monorepo).
-Monorepo layout: packages/client (React + Vite) and packages/server (TypeScript Lambda handlers ).
+## Monorepo layout: packages/client (React + Vite) and packages/server (TypeScript Lambda handlers ).
 
-Description
+## Description:
+
 Expense Tracker is a simple full-stack app that helps users record and review personal spending.
 Key features:
 
@@ -14,7 +14,7 @@ Key features:
 - Local development uses an Express wrapper that calls the same Lambda handlers used in production (keeps local and prod behavior identical).
 - Frontend uses React + Vite with hooks + presentational view separation. Data fetching and optimistic updates use @tanstack/react-query.
 
-Table of contents
+## Table of contents
 
 1. Prerequisites
 2. Quick start — one-command setup
@@ -25,7 +25,8 @@ Table of contents
 7. Architecture overview (text + diagram)
 8. Key design decisions
 
-Prerequisites
+## Prerequisites :
+
 Installed on your machine (recommended):
 
 - Node.js LTS (≥ 20.x)
@@ -35,43 +36,45 @@ Installed on your machine (recommended):
 - (Optional) serverless CLI for server deploys (server package already depends on serverless)
 - aws CLI profile used in our deploy script: default expense-tracker or set AWS_PROFILE environment variable
 
-Quick start — one-command setup
+## Quick start — one-command setup:
+
 From the repository root:
 
-# 1) install dependencies for the whole monorepo
+**1) install dependencies for the whole monorepo**
 
 pnpm install
 
-# 2) copy env examples to the packages
+**2) copy env examples to the packages**
 
-# -> packages/client/.env
+-> packages/client/.env
 
-# -> packages/server/.env
+-> packages/server/.env
 
-# 3) validate envs BEFORE starting or building
+**3) validate envs BEFORE starting or building**
 
-# Check both packages:
+**Check both packages:**
 
 run at root:
 pnpm run check:env
 
-# 4) run build once
+**4) run build once**
 
 pnpm run build # builds client and server
 
-# 5) run the full dev environment (client + local server)
+**5) run the full dev environment (client + local server)**
 
 pnpm run dev:all
 
-# OR run just the client or server:
+**OR run just the client or server:**
 
-# pnpm --filter client dev
+pnpm --filter client dev
 
-# pnpm --filter server dev
+pnpm --filter server dev
 
 pnpm run dev:all uses the root orchestrator scripts to run both packages. See Run locally below for variations.
 
-Environment variables & files (what goes where)
+## Environment variables & files (what goes where)
+
 The repository expects per-package .env files (placed in each package) or shell environment variables. These are validated by scripts/check-env.js (root) using env-manifest.json.
 Files:
 
@@ -102,7 +105,8 @@ How env validation works
 - A Node script scripts/check-env.js (root) loads package .env (via dotenv) when invoked with --package <name> and validates keys defined in that package's env-manifest.json.
 - packages/client/package.json contains predev / prebuild hooks that run the validator before Vite starts or builds: predev: node ../../scripts/check-env.js --package client. That ensures missing client envs fail early (before Vite serves) — see Troubleshooting if your project still starts without error.
 
-Production secrets (AWS SSM)
+## Production secrets (AWS SSM)
+
 For production, server secrets are stored in AWS SSM Parameter Store as SecureString. The deploy script reads these values:
 
 - /expense-tracker/mongo-uri → MONGO_URI
@@ -130,11 +134,11 @@ Start server
 The server handlers are implemented as AWS Lambda-style functions but you run them locally via an Express harness (no Serverless Offline required).
 From repo root:
 
-# run server only (local express)
+## run server only (local express)
 
 pnpm --filter server dev
 
-# or inside packages/server
+## or inside packages/server
 
 cd packages/server
 pnpm dev # uses ts-node-dev and src/local-dev.ts
@@ -146,7 +150,7 @@ pnpm dev # uses ts-node-dev and src/local-dev.ts
 
 pnpm --filter client dev
 
-# or inside packages/client
+## or inside packages/client
 
 cd packages/client
 pnpm dev
@@ -158,22 +162,24 @@ pnpm run dev:all
 
 dev:all runs both client and server concurrently.
 
-Build & CI scripts
+## Build & CI scripts
+
 Root-level scripts you can call (summary):
 
 - pnpm run build:all— builds client + server (runs package build scripts)
 - pnpm run dev:all — runs both packages in dev mode
 
-Deploy (server & client)
+## Deploy (server & client)
+
 Server (AWS Lambda via Serverless)
 The repo contains a deploy wrapper which fetches secrets from SSM and runs Serverless deploy:
 Root script (example you shared):
 
-# packages/server/src/scripts/deploy-live.sh
+**packages/server/src/scripts/deploy-live.sh**
 
-# root: pnpm run deploy:server
+root: pnpm run deploy:server
 
-Deploy flow:
+## Deploy flow:
 
 1. Store secrets in SSM Parameter Store:aws ssm put-parameter --name /expense-tracker/mongo-uri --type SecureString --value "mongodb+srv://..." --profile expense-tracker --region us-east-1
 2. aws ssm put-parameter --name /expense-tracker/jwt-secret --type SecureString --value "SOME_SECRET" --profile expense-tracker --region us-east-1
@@ -185,8 +191,9 @@ Deploy flow:
 - You must configure AWS_PROFILE and AWS_REGION (or rely on defaults in the script).
 - Serverless will package and deploy Lambda functions and API Gateway endpoints.
 
-Architecture overview (text + diagram)
-Text summary
+## Architecture overview (text + diagram)
+
+**Text summary**
 
 - The project is a monorepo with two main packages:
   - client — React (Vite), purely presentational app that calls server API.
@@ -221,8 +228,9 @@ Github repo link : https://github.com/Marshall-D/expense-tracker-monorepo
 
 Frontend deployed link : https://main.dfqt4gagqhj6v.amplifyapp.com
 
-Backend deployed links :
-endpoints:
+**Backend deployed links :**
+**endpoints:**
+
 GET - https://uphk9dlqh2.execute-api.us-east-1.amazonaws.com/api/health
 POST - https://uphk9dlqh2.execute-api.us-east-1.amazonaws.com/api/auth/register
 POST - https://uphk9dlqh2.execute-api.us-east-1.amazonaws.com/api/auth/login

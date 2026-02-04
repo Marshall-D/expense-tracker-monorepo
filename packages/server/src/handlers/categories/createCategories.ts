@@ -1,13 +1,12 @@
 // packages/server/src/handlers/createCategories.ts
+
 /**
  * POST /api/categories
  *
  * Responsibilities:
- *  - Validate request body (createCategorySchema)
- *  - Prevent duplicates against global categories or this user's categories (case-insensitive)
- *  - Insert a new user-owned (Custom) category and return its metadata
- *
- * Behaviour preserved.
+ *  - Validate request body using createCategorySchema
+ *  - Prevent duplicate names (case-insensitive) against global or user's categories
+ *  - Insert a new user-owned category document and return metadata
  */
 
 import type { APIGatewayProxyHandler } from "aws-lambda";
@@ -18,22 +17,31 @@ import { createCategorySchema } from "../../lib/validators";
 import { getDb } from "../../lib/mongo";
 import { ObjectId } from "mongodb";
 
+/**
+ * createCategoryImpl
+ * - Core implementation of POST /api/categories (not wrapped)
+ * - Uses parseAndValidate to parse/validate body, then writes to DB
+ */
 const createCategoryImpl: APIGatewayProxyHandler = async (event) => {
+  // Short-circuit CORS preflight
   if (event.httpMethod === "OPTIONS") {
     return emptyOptionsResponse();
   }
 
+  // Parse and validate JSON body against schema
   const parsed = parseAndValidate(createCategorySchema, event);
-  if (!parsed.ok) return parsed.response;
+  if (!parsed.ok) return parsed.response; // early return on invalid payload
 
-  // normalize: trim whitespace but preserve original casing for display
+  // Normalize name: trim whitespace but keep original casing for display
   const rawName = parsed.data.name as string;
   const name = rawName.trim();
   const color = parsed.data.color as string | undefined;
 
+  // Get authenticated user id from requestContext.authorizer (requireAuth will ensure presence)
   const userId = (event.requestContext as any)?.authorizer?.userId;
   if (!userId) return jsonResponse(401, { error: "unauthorized" });
 
+  // Acquire DB connection
   const db = await getDb();
   if (!db)
     return jsonResponse(503, {
@@ -44,22 +52,25 @@ const createCategoryImpl: APIGatewayProxyHandler = async (event) => {
   try {
     const categories = db.collection("categories");
 
-    // Prevent duplicates against global categories or this user's categories (case-insensitive).
+    // Prevent duplicates: check for existing category with same name that is global (userId:null)
+    // or owned by this user. Use collation with strength:2 for case-insensitive compare.
     const existing = await categories.findOne(
       {
         name,
         $or: [{ userId: null }, { userId: new ObjectId(userId) }],
       },
-      { collation: { locale: "en", strength: 2 } }
+      { collation: { locale: "en", strength: 2 } }, // case-insensitive
     );
 
     if (existing) {
+      // 409 Conflict when name already exists for either global or this user
       return jsonResponse(409, {
         error: "category_exists",
         message: "Category with that name already exists (global or yours).",
       });
     }
 
+    // Prepare doc and insert (user-owned custom category)
     const now = new Date();
     const doc = {
       name,
@@ -70,13 +81,13 @@ const createCategoryImpl: APIGatewayProxyHandler = async (event) => {
     };
     const res = await categories.insertOne(doc);
 
-    // return created resource meta (client can adapt if it expects just { id })
+    // Return created metadata (201)
     return jsonResponse(201, {
       data: {
         id: String(res.insertedId),
         name,
         color: color ?? null,
-        userId, // original behaviour returned raw userId string
+        userId, // keep behaviour: return raw userId string
         type: "Custom",
       },
     });
@@ -89,4 +100,5 @@ const createCategoryImpl: APIGatewayProxyHandler = async (event) => {
   }
 };
 
+// Export wrapped handler (requireAuth enforces JWT and attaches authorizer)
 export const handler = requireAuth(createCategoryImpl);

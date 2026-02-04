@@ -1,13 +1,13 @@
 // packages/server/src/handlers/monthlyReports.ts
+
 /**
  * Monthly report handler — returns totals and top categories for a given year/month.
  *
  * Responsibilities:
- *  - Validate year/month query
+ *  - Validate `year` and `month` query params
  *  - Compute canonical UTC month boundaries
  *  - Aggregate totals by currency and compute top categories
- *
- * Preserves original behaviour and response shapes.
+ *  - Return JSON with totals and top categories
  */
 
 import type { APIGatewayProxyHandler } from "aws-lambda";
@@ -18,6 +18,7 @@ import { z } from "zod";
 import { ObjectId } from "mongodb";
 import { parseQuery } from "../../lib/query";
 
+/* Query schema: year (YYYY) and month (1-12), both passed as strings and transformed to numbers */
 const querySchema = z.object({
   year: z
     .string()
@@ -29,21 +30,28 @@ const querySchema = z.object({
     .transform(Number),
 });
 
+/* Core implementation */
 const reportsMonthlyImpl: APIGatewayProxyHandler = async (event) => {
+  // Preflight handling
   if (event.httpMethod === "OPTIONS") return emptyOptionsResponse();
 
+  // Extract userId from requestContext (set by requireAuth wrapper)
   const userId = (event.requestContext as any)?.authorizer?.userId;
   if (!userId) return jsonResponse(401, { error: "unauthorized" });
 
+  // Parse and validate the query parameters
   const parsed = parseQuery(querySchema, event);
   if (!parsed.ok) return parsed.response;
 
   const { year, month } = parsed.data;
 
-  // canonical UTC month boundaries (start inclusive, end exclusive)
+  // Compute canonical UTC month boundaries:
+  // start = first day of requested month at 00:00:00 UTC
+  // end   = first day of next month at 00:00:00 UTC (exclusive)
   const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
   const end = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0));
 
+  // Acquire DB
   const db = await getDb();
   if (!db)
     return jsonResponse(503, {
@@ -55,7 +63,7 @@ const reportsMonthlyImpl: APIGatewayProxyHandler = async (event) => {
   try {
     const expenses = db.collection("expenses");
 
-    // totals by currency (only USD and NGN supported)
+    // Aggregation: totals grouped by currency (USD, NGN)
     const totalsByCurrency = await expenses
       .aggregate([
         {
@@ -77,7 +85,7 @@ const reportsMonthlyImpl: APIGatewayProxyHandler = async (event) => {
       ])
       .toArray();
 
-    // top categories by total (across currencies)
+    // Aggregation: top 5 categories by total amount across currencies
     const topCategories = await expenses
       .aggregate([
         {
@@ -105,12 +113,14 @@ const reportsMonthlyImpl: APIGatewayProxyHandler = async (event) => {
       ])
       .toArray();
 
+    // Return the aggregated results and a canonical period label YYYY-MM
     return jsonResponse(200, {
       period: `${year}-${String(month).padStart(2, "0")}`,
       totals: totalsByCurrency,
       topCategories,
     });
   } catch (err) {
+    // Log and return 500 on unexpected errors
     console.error("reports.monthly error:", err);
     return jsonResponse(500, {
       error: "server_error",
@@ -119,4 +129,5 @@ const reportsMonthlyImpl: APIGatewayProxyHandler = async (event) => {
   }
 };
 
+// Wrap with requireAuth and export
 export const handler = requireAuth(reportsMonthlyImpl);

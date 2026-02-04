@@ -1,15 +1,14 @@
 // packages/server/src/handlers/updateBudget.ts
+
 /**
  * PUT /api/budgets/{id}
  *
  * Responsibilities:
- *  - Validate path id and authentication
+ *  - Validate path id and auth
  *  - Validate request body (updateBudgetSchema)
- *  - Resolve category/categoryId and validate accessibility
- *  - Normalize periodStart and ensure uniqueness rules
- *  - Update budget and return normalized response
- *
- * Behaviour preserved from original implementation.
+ *  - Resolve category/categoryId updates and accessibility
+ *  - Normalize periodStart and detect uniqueness conflicts
+ *  - Apply updates and return updated document
  */
 
 import type { APIGatewayProxyHandler } from "aws-lambda";
@@ -21,11 +20,14 @@ import { getDb } from "../../lib/mongo";
 import { ObjectId } from "mongodb";
 
 const updateBudgetImpl: APIGatewayProxyHandler = async (event) => {
+  // 1) Preflight
   if (event.httpMethod === "OPTIONS") return emptyOptionsResponse();
 
+  // 2) Auth
   const userId = (event.requestContext as any)?.authorizer?.userId;
   if (!userId) return jsonResponse(401, { error: "unauthorized" });
 
+  // 3) Path id resolution
   const pathParams = (event.pathParameters || {}) as Record<
     string,
     string | undefined
@@ -37,6 +39,7 @@ const updateBudgetImpl: APIGatewayProxyHandler = async (event) => {
       message: "Budget id is required",
     });
 
+  // 4) Validate ObjectId
   let bid: ObjectId;
   try {
     bid = new ObjectId(id);
@@ -47,16 +50,19 @@ const updateBudgetImpl: APIGatewayProxyHandler = async (event) => {
     });
   }
 
+  // 5) Validate request body
   const parsed = parseAndValidate(updateBudgetSchema, event);
   if (!parsed.ok) return parsed.response;
   const updates = parsed.data as any;
 
+  // 6) Ensure there is at least one field to update
   if (!updates || Object.keys(updates).length === 0)
     return jsonResponse(400, {
       error: "no_updates",
       message: "Provide at least one field to update.",
     });
 
+  // 7) DB handle
   const db = await getDb();
   if (!db)
     return jsonResponse(503, {
@@ -68,16 +74,15 @@ const updateBudgetImpl: APIGatewayProxyHandler = async (event) => {
     const budgets = db.collection("budgets");
     const categories = db.collection("categories");
 
-    // Build immutable setPayload object
+    // 8) Build immutable setPayload for $set
     const setPayload: any = {};
 
     if (typeof updates.amount !== "undefined")
       setPayload.amount = updates.amount;
 
-    // categoryId update handling (resolve name)
+    // 9) If categoryId explicitly provided (can be null to remove)
     if (typeof updates.categoryId !== "undefined") {
       if (updates.categoryId === null) {
-        // allow removing category association
         setPayload.categoryId = null;
         setPayload.category = "Uncategorized";
       } else {
@@ -102,7 +107,7 @@ const updateBudgetImpl: APIGatewayProxyHandler = async (event) => {
         }
       }
     } else if (typeof updates.category !== "undefined") {
-      // try resolving by name (user-specific then global)
+      // 10) Category name update: try to resolve user-specific then global
       const cat =
         (await categories.findOne({
           name: updates.category,
@@ -119,7 +124,7 @@ const updateBudgetImpl: APIGatewayProxyHandler = async (event) => {
       }
     }
 
-    // periodStart normalization (start of month UTC)
+    // 11) periodStart normalization (if provided)
     if (typeof updates.periodStart !== "undefined") {
       const p = new Date(updates.periodStart);
       if (Number.isNaN(p.getTime())) {
@@ -129,13 +134,14 @@ const updateBudgetImpl: APIGatewayProxyHandler = async (event) => {
         });
       }
       setPayload.periodStart = new Date(
-        Date.UTC(p.getUTCFullYear(), p.getUTCMonth(), 1)
+        Date.UTC(p.getUTCFullYear(), p.getUTCMonth(), 1),
       );
     }
 
+    // 12) Always set updatedAt
     setPayload.updatedAt = new Date();
 
-    // If categoryId changed/was provided, ensure uniqueness for user + categoryId
+    // 13) If we changed categoryId, ensure no other budget exists for this user+categoryId
     if (Object.prototype.hasOwnProperty.call(setPayload, "categoryId")) {
       const effectiveCategoryId = setPayload.categoryId;
       if (effectiveCategoryId !== null) {
@@ -153,18 +159,21 @@ const updateBudgetImpl: APIGatewayProxyHandler = async (event) => {
       }
     }
 
+    // 14) Perform atomic update and return updated document
     const result = await budgets.findOneAndUpdate(
       { _id: bid, userId: new ObjectId(userId) },
       { $set: setPayload },
-      { returnDocument: "after" }
+      { returnDocument: "after" },
     );
 
+    // 15) If not found, return 404
     if (!result.value)
       return jsonResponse(404, {
         error: "not_found",
         message: "Budget not found.",
       });
 
+    // 16) Normalize and return updated document
     const doc = result.value;
     const resp = {
       id: String(doc._id),

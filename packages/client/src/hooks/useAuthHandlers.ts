@@ -1,14 +1,10 @@
 // packages/client/src/hooks/useAuthHandlers.ts
-
 /**
- * useAuthHandlers
- *
- * - Validates input fields locally (using lib/validators/auth) before calling server.
- *
- * Behaviour:
- *  - on validation failure: set inline formError, show toast (long), focus relevant field
- *  - on server failure: set inline formError, show toast, focus first field
- *
+ * Hooks used by Login/Register forms.
+ * - Validates inputs on the client
+ * - Calls server mutations (useLogin / useRegister)
+ * - Shows inline form errors and toast messages
+ * - Focuses the relevant input on error
  */
 
 import { useCallback, useState } from "react";
@@ -19,25 +15,21 @@ import { useRegister } from "./useRegister";
 import { ROUTES } from "@/utils";
 import { validateEmail, validatePassword, validateName, t } from "@/lib";
 
-type LoginFormShape = {
-  email: string;
-  password: string;
-};
+type LoginFormShape = { email: string; password: string };
+type RegisterFormShape = { name: string; email: string; password: string };
 
-type RegisterFormShape = {
-  name: string;
-  email: string;
-  password: string;
-};
-
+/**
+ * useLoginHandler
+ * - wraps useLogin() mutation with client validation + UX behavior
+ */
 export function useLoginHandler() {
-  const navigate = useNavigate();
-  const mutation = useLogin();
+  const navigate = useNavigate(); // navigate on success
+  const mutation = useLogin(); // react-query mutation
   const { mutateAsync } = mutation;
-  const isLoading = mutation.status === "pending";
-  const [formError, setFormError] = useState<string | null>(null);
+  const isLoading = mutation.status === "pending"; // loading state
+  const [formError, setFormError] = useState<string | null>(null); // inline form error
 
-  // safe DOM focus helper — defensive for SSR and non-existent ids
+  // small helper to focus/select a DOM input by id (safe for SSR)
   const focusField = useCallback((id: string) => {
     try {
       const el = document.getElementById(id) as HTMLInputElement | null;
@@ -45,20 +37,24 @@ export function useLoginHandler() {
         el.focus();
         el.select?.();
       }
-    } catch {}
+    } catch {
+      /* ignore errors */
+    }
   }, []);
 
+  // submit handler used by the login form element
   const handleSubmit = useCallback(
     async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
       e.stopPropagation();
       setFormError(null);
 
+      // read values from form
       const form = new FormData(e.currentTarget);
       const email = String(form.get("email") || "").trim();
       const password = String(form.get("password") || "");
 
-      // client-side validation
+      // client-side email validation
       const emailV = validateEmail(email);
       if (!emailV.ok) {
         setFormError(emailV.error);
@@ -67,6 +63,7 @@ export function useLoginHandler() {
         return;
       }
 
+      // client-side password validation
       const passV = validatePassword(password);
       if (!passV.ok) {
         setFormError(passV.error);
@@ -75,10 +72,12 @@ export function useLoginHandler() {
         return;
       }
 
+      // call server
       try {
         await mutateAsync({ email, password } as LoginFormShape);
-        navigate(ROUTES.DASHBOARD);
+        navigate(ROUTES.DASHBOARD); // on success redirect
       } catch (err: any) {
+        // normalize server error for display
         const msg =
           err?.response?.data?.message ||
           err?.response?.data?.error ||
@@ -89,17 +88,16 @@ export function useLoginHandler() {
         focusField("email");
       }
     },
-    [mutateAsync, navigate, focusField]
+    [mutateAsync, navigate, focusField],
   );
 
-  return {
-    handleSubmit,
-    isLoading,
-    formError,
-    focusField,
-  };
+  return { handleSubmit, isLoading, formError, focusField };
 }
 
+/**
+ * useRegisterHandler
+ * - mirrors login handler but uses useRegister + name validation
+ */
 export function useRegisterHandler() {
   const navigate = useNavigate();
   const mutation = useRegister();
@@ -128,7 +126,7 @@ export function useRegisterHandler() {
       const email = String(form.get("email") || "").trim();
       const password = String(form.get("password") || "");
 
-      // client validation
+      // client-side name/email/password validation
       const nameV = validateName(name);
       if (!nameV.ok) {
         setFormError(nameV.error);
@@ -164,13 +162,8 @@ export function useRegisterHandler() {
         focusField("email");
       }
     },
-    [mutateAsync, navigate, focusField]
+    [mutateAsync, navigate, focusField],
   );
 
-  return {
-    handleSubmit,
-    isLoading,
-    formError,
-    focusField,
-  };
+  return { handleSubmit, isLoading, formError, focusField };
 }

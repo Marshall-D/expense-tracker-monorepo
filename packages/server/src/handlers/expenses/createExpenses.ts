@@ -2,12 +2,10 @@
 /**
  * POST /api/expenses
  *
- * Responsibilities:
- *  - Validate request body (createExpenseSchema)
- *  - Resolve category/categoryId (validate category accessibility)
- *  - Insert expense document with normalized fields
- *
- * Behaviour preserved; consistent JSON/CORS responses via jsonResponse + emptyOptionsResponse.
+ * - Validates incoming JSON body with createExpenseSchema
+ * - Resolves categoryId / category name (validates accessibility)
+ * - Inserts a normalized expense document into `expenses` collection
+ * - Responds with 201 { id } on success
  */
 
 import type { APIGatewayProxyHandler } from "aws-lambda";
@@ -18,12 +16,20 @@ import { createExpenseSchema } from "../../lib/validators";
 import { getDb } from "../../lib/mongo";
 import { ObjectId } from "mongodb";
 
+/**
+ * createExpenseImpl - core implementation (not wrapped)
+ * - Accepts an APIGateway-style event and returns APIGatewayProxyResult
+ */
 const createExpenseImpl: APIGatewayProxyHandler = async (event) => {
+  // 1) Handle OPTIONS preflight quickly (no auth or DB work)
   if (event.httpMethod === "OPTIONS") return emptyOptionsResponse();
 
+  // 2) Parse and validate the JSON body against createExpenseSchema.
+  //    parseAndValidate returns either { ok: true, data } or { ok: false, response }.
   const parsed = parseAndValidate(createExpenseSchema, event);
-  if (!parsed.ok) return parsed.response;
+  if (!parsed.ok) return parsed.response; // early-return validation error
 
+  // 3) Destructure validated values (TypeScript typing for clarity)
   const { amount, currency, description, category, date, categoryId } =
     parsed.data as {
       amount: number;
@@ -34,11 +40,11 @@ const createExpenseImpl: APIGatewayProxyHandler = async (event) => {
       date?: string;
     };
 
+  // 4) Get authenticated user id from requestContext.authorizer (set by requireAuth)
   const userId = (event.requestContext as any)?.authorizer?.userId;
-  if (!userId) {
-    return jsonResponse(401, { error: "unauthorized" });
-  }
+  if (!userId) return jsonResponse(401, { error: "unauthorized" });
 
+  // 5) Acquire DB; if missing, return 503 with helpful message
   const db = await getDb();
   if (!db)
     return jsonResponse(503, {
@@ -50,19 +56,21 @@ const createExpenseImpl: APIGatewayProxyHandler = async (event) => {
     const categoriesColl = db.collection("categories");
     const expenses = db.collection("expenses");
 
-    // Resolve categoryId and normalized category name
+    // 6) Resolve categoryId and category name to consistent values used in DB
     let resolvedCategoryId: ObjectId | null = null;
     let resolvedCategoryName: string = category ?? "Uncategorized";
 
-    // 1) If categoryId provided, validate it exists and is accessible
+    // 6a) If categoryId provided: validate it's a proper ObjectId and accessible
     if (categoryId) {
       try {
         const cid = new ObjectId(categoryId);
+        // Allow either user-owned category or global (userId: null)
         const cat = await categoriesColl.findOne({
           _id: cid,
           $or: [{ userId: new ObjectId(userId) }, { userId: null }],
         });
         if (!cat) {
+          // invalid or not accessible
           return jsonResponse(400, {
             error: "invalid_category",
             message: "Category not found or not accessible.",
@@ -71,13 +79,14 @@ const createExpenseImpl: APIGatewayProxyHandler = async (event) => {
         resolvedCategoryId = cid;
         resolvedCategoryName = cat.name;
       } catch {
+        // invalid ObjectId format
         return jsonResponse(400, {
           error: "invalid_category_id",
           message: "categoryId is not a valid ObjectId.",
         });
       }
     } else if (category && category.trim()) {
-      // 2) If only category name provided, try to find user-specific then global
+      // 6b) If only category name provided: try user-specific first, then global
       const userCat = await categoriesColl.findOne({
         name: category,
         userId: new ObjectId(userId),
@@ -94,12 +103,13 @@ const createExpenseImpl: APIGatewayProxyHandler = async (event) => {
         resolvedCategoryId = cat._id;
         resolvedCategoryName = cat.name;
       } else {
-        // Not found -> store string only (optional: auto-create category here)
+        // not found: keep string only (we don't auto-create here)
         resolvedCategoryId = null;
         resolvedCategoryName = category;
       }
     }
 
+    // 7) Build normalized expense document
     const now = new Date();
     const expenseDoc: any = {
       userId: new ObjectId(userId),
@@ -112,9 +122,13 @@ const createExpenseImpl: APIGatewayProxyHandler = async (event) => {
       createdAt: now,
     };
 
+    // 8) Insert document
     const res = await expenses.insertOne(expenseDoc);
+
+    // 9) Return created id
     return jsonResponse(201, { id: res.insertedId });
   } catch (err) {
+    // 10) Log and return generic 500 (no internal details leaked)
     console.error("createExpense error:", err);
     return jsonResponse(500, {
       error: "server_error",
@@ -123,4 +137,5 @@ const createExpenseImpl: APIGatewayProxyHandler = async (event) => {
   }
 };
 
+// 11) Wrap implementation with requireAuth to enforce JWT auth and export as handler
 export const handler = requireAuth(createExpenseImpl);

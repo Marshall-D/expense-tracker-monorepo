@@ -19,7 +19,6 @@ export async function getDb(): Promise<any | null> {
   if (g.__mongoDb) return g.__mongoDb;
 
   if (!g.__mongoClient) {
-    // dynamic import ensures Lambda init won't fail if module resolution is odd
     const { MongoClient } = await import("mongodb");
     g.__mongoClient = new MongoClient(uri, { maxPoolSize: 10 });
     await g.__mongoClient.connect();

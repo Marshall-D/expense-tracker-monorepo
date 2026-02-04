@@ -1,11 +1,15 @@
 // packages/client/src/hooks/useExpenses.ts
+
+/**
+ * Hooks for Expenses: list, single, create/update/delete w/ optimistic updates
+ */
+
 import {
   useMutation,
   useQuery,
   useQueryClient,
   keepPreviousData,
 } from "@tanstack/react-query";
-
 import * as expensesService from "@/services";
 import { queryKeys, t } from "@/lib";
 import type {
@@ -15,20 +19,19 @@ import type {
 } from "@/types";
 
 /**
- * useExpenses - fetch paginated expenses list
- * params corresponds to query params supported by the backend (from, to, category, limit, page, q)
+ * useExpenses(params) - paginated list
+ * - placeholderData: keepPreviousData helps smooth pagination changes
  */
 export const useExpenses = (params?: Record<string, any>) =>
   useQuery<ExpensesListResponse, Error>({
     queryKey: [queryKeys.expenses, params ?? {}],
     queryFn: () => expensesService.fetchExpenses(params),
-    // keepPreviousData helps smooth pagination transitions
     placeholderData: keepPreviousData,
     staleTime: 1000 * 30,
   });
 
 /**
- * useExpense - fetch a single expense by id
+ * useExpense(id) - single expense
  */
 export const useExpense = (id?: string) =>
   useQuery<Expense>({
@@ -43,7 +46,7 @@ export const useExpense = (id?: string) =>
   });
 
 /**
- * useCreateExpense - mutation with optimistic update for list cache
+ * useCreateExpense - optimistic add to list
  */
 type CreateContext = {
   previous?: ExpensesListResponse | undefined;
@@ -54,16 +57,15 @@ export const useCreateExpense = () => {
   const qc = useQueryClient();
 
   return useMutation<
-    { id: string }, // result
+    { id: string },
     Error,
-    ExpenseCreatePayload, // variables
+    ExpenseCreatePayload,
     CreateContext
   >({
     mutationFn: (payload) => expensesService.createExpense(payload),
 
     onMutate: async (payload) => {
       await qc.cancelQueries({ queryKey: [queryKeys.expenses] });
-
       const previous = qc.getQueryData<ExpensesListResponse | undefined>([
         queryKeys.expenses,
       ]);
@@ -94,19 +96,16 @@ export const useCreateExpense = () => {
           data: [optimisticItem],
         });
       }
-
       return { previous, optimisticId: optimisticItem.id };
     },
 
     onError: (err, variables, context) => {
-      if (context?.previous) {
+      if (context?.previous)
         qc.setQueryData([queryKeys.expenses], context.previous);
-      }
       t.error(err?.message ?? "Failed to add expense");
     },
 
     onSuccess: () => {
-      // server returned id; invalidate to sync and show success toast
       qc.invalidateQueries({ queryKey: [queryKeys.expenses] });
       t.success("Expense added");
     },
@@ -120,8 +119,7 @@ export const useCreateExpense = () => {
 };
 
 /**
- * useUpdateExpense - updates a single expense with optimistic update
- * variables: { id, payload }
+ * useUpdateExpense - optimistic update
  */
 type UpdateVars = { id: string; payload: ExpenseCreatePayload };
 type UpdateContext = {
@@ -137,12 +135,9 @@ export const useUpdateExpense = () => {
 
     onMutate: async ({ id, payload }) => {
       await qc.cancelQueries({ queryKey: [queryKeys.expenses] });
-
       const previous = qc.getQueryData<ExpensesListResponse | undefined>([
         queryKeys.expenses,
       ]);
-
-      // Capture previous single item if present
       const previousItem = previous?.data.find((d) => d.id === id);
 
       if (previous) {
@@ -158,16 +153,16 @@ export const useUpdateExpense = () => {
                   categoryId: payload.categoryId ?? d.categoryId,
                   date: payload.date ?? d.date,
                 }
-              : d
+              : d,
           ),
         };
         qc.setQueryData([queryKeys.expenses], newData);
       }
 
-      // also update single expense cache if present
+      // update single expense cache if present
       const singleKey = [queryKeys.expense, id];
       const prevSingle = qc.getQueryData<Expense | undefined>(singleKey);
-      if (prevSingle) {
+      if (prevSingle)
         qc.setQueryData<Expense>(singleKey, {
           ...prevSingle,
           amount: payload.amount ?? prevSingle.amount,
@@ -176,19 +171,15 @@ export const useUpdateExpense = () => {
           categoryId: payload.categoryId ?? prevSingle.categoryId,
           date: payload.date ?? prevSingle.date,
         });
-      }
 
       return { previous, previousItem };
     },
 
     onError: (err, vars, context) => {
-      if (context?.previous) {
+      if (context?.previous)
         qc.setQueryData([queryKeys.expenses], context.previous);
-      }
-      // If we captured a previous single item, restore it too
-      if (context?.previousItem) {
+      if (context?.previousItem)
         qc.setQueryData([queryKeys.expense, vars.id], context.previousItem);
-      }
       t.error(err?.message ?? "Failed to update expense");
     },
 
@@ -208,7 +199,7 @@ export const useUpdateExpense = () => {
 };
 
 /**
- * useDeleteExpense - deletes expense with optimistic removal
+ * useDeleteExpense - optimistic removal
  */
 export const useDeleteExpense = () => {
   const qc = useQueryClient();
@@ -223,29 +214,23 @@ export const useDeleteExpense = () => {
 
     onMutate: async (id) => {
       await qc.cancelQueries({ queryKey: [queryKeys.expenses] });
-
       const previous = qc.getQueryData<ExpensesListResponse | undefined>([
         queryKeys.expenses,
       ]);
 
-      if (previous) {
+      if (previous)
         qc.setQueryData<ExpensesListResponse>([queryKeys.expenses], {
           ...previous,
           total: Math.max(0, previous.total - 1),
           data: previous.data.filter((d) => d.id !== id),
         });
-      }
-
-      // remove single expense cache too
       qc.removeQueries({ queryKey: [queryKeys.expense, id] });
-
       return { previous };
     },
 
     onError: (err, id, context) => {
-      if (context?.previous) {
+      if (context?.previous)
         qc.setQueryData([queryKeys.expenses], context.previous);
-      }
       t.error(err?.message ?? "Failed to delete expense");
     },
 

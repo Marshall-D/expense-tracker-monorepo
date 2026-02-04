@@ -1,13 +1,13 @@
 // packages/server/src/handlers/getAllExpenses.ts
+
 /**
  * GET /api/expenses
  *
  * Responsibilities:
- *  - Validate & parse query params (from, to, category, categoryId, categoryIds, q, limit, page)
- *  - Build Mongo filter with precedence rules (categoryIds > categoryId > category)
- *  - Apply pagination and return total + page + limit + data
- *
- * Note: uses parseQuery helper to normalise query validation errors and jsonResponse for replies.
+ * - Validate query params (from, to, category, categoryId, categoryIds, q, limit, page)
+ * - Build MongoDB filter with precedence: categoryIds > categoryId > category
+ * - Support text search (description OR category)
+ * - Apply pagination (limit/page) and return { total, page, limit, data }
  */
 
 import type { APIGatewayProxyHandler } from "aws-lambda";
@@ -18,9 +18,7 @@ import { ObjectId } from "mongodb";
 import { z } from "zod";
 import { parseQuery } from "../../lib/query";
 
-/**
- * Query schema for GET /api/expenses
- */
+/* Query validation schema with transforms for numeric params */
 const getAllExpensesQuerySchema = z.object({
   from: z
     .string()
@@ -34,16 +32,13 @@ const getAllExpensesQuerySchema = z.object({
     .refine((s) => !s || !Number.isNaN(Date.parse(s)), {
       message: "invalid to date",
     }),
-  // exact category name match (legacy single)
   category: z.string().min(1).optional(),
-  // categoryId single (legacy)
   categoryId: z
     .string()
     .optional()
     .refine((s) => !s || /^[0-9a-fA-F]{24}$/.test(s), {
       message: "invalid categoryId",
     }),
-  // new: multiple category ids as comma-separated list
   categoryIds: z
     .string()
     .optional()
@@ -53,9 +48,9 @@ const getAllExpensesQuerySchema = z.object({
         const parts = s.split(",").filter(Boolean);
         return parts.every((p) => /^[0-9a-fA-F]{24}$/.test(p));
       },
-      { message: "invalid categoryIds" }
+      { message: "invalid categoryIds" },
     ),
-  q: z.string().optional(), // search query (description OR category)
+  q: z.string().optional(),
   limit: z
     .union([z.string(), z.number()])
     .optional()
@@ -76,21 +71,24 @@ const getAllExpensesQuerySchema = z.object({
     }),
 });
 
-// Escape user input for safe RegExp use
+/* Utility to escape user input for regex usage (prevents accidental regex injection) */
 function escapeRegex(input: string) {
   return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 const getAllExpensesImpl: APIGatewayProxyHandler = async (event) => {
+  // 1) OPTIONS preflight
   if (event.httpMethod === "OPTIONS") return emptyOptionsResponse();
 
+  // 2) Auth
   const userId = (event.requestContext as any)?.authorizer?.userId;
   if (!userId) return jsonResponse(401, { error: "unauthorized" });
 
-  // use central parseQuery to validate query params
+  // 3) Validate query params centrally
   const parsed = parseQuery(getAllExpensesQuerySchema, event);
   if (!parsed.ok) return parsed.response;
 
+  // 4) Extract params and set defaults for pagination
   const {
     from,
     to,
@@ -106,6 +104,7 @@ const getAllExpensesImpl: APIGatewayProxyHandler = async (event) => {
   const page = typeof maybePage === "number" ? maybePage : 1;
   const skip = (page - 1) * limit;
 
+  // 5) DB handle
   const db = await getDb();
   if (!db)
     return jsonResponse(503, {
@@ -116,10 +115,11 @@ const getAllExpensesImpl: APIGatewayProxyHandler = async (event) => {
   try {
     const expenses = db.collection("expenses");
 
-    // base filter: only this user's expenses
+    // 6) Build base filter for this user
     const filter: any = { userId: new ObjectId(userId) };
 
-    // handle multiple categoryIds if provided (highest precedence)
+    // 7) Category precedence:
+    // categoryIds (CSV) > categoryId > category name
     if (categoryIds) {
       const parts = categoryIds.split(",").filter(Boolean);
       filter.categoryId = { $in: parts.map((p) => new ObjectId(p)) };
@@ -129,24 +129,22 @@ const getAllExpensesImpl: APIGatewayProxyHandler = async (event) => {
       filter.category = category;
     }
 
-    // date range
+    // 8) Date range
     if (from || to) {
       filter.date = {};
       if (from) filter.date.$gte = new Date(from);
       if (to) filter.date.$lte = new Date(to);
     }
 
-    // handle text search (q)
+    // 9) Text search q: if category-filter present, search description only,
+    // otherwise search description OR category.
     if (q && q.trim()) {
       const term = q.trim();
       const regex = new RegExp(escapeRegex(term), "i");
 
-      // If category/categoryId(s) provided, we already filter by category; in that case
-      // apply the search to description only (i.e., both category AND description must match)
       if (category || categoryId || categoryIds) {
         filter.description = { $regex: regex };
       } else {
-        // No explicit category filter: search description OR category fields
         filter.$or = [
           { description: { $regex: regex } },
           { category: { $regex: regex } },
@@ -154,8 +152,10 @@ const getAllExpensesImpl: APIGatewayProxyHandler = async (event) => {
       }
     }
 
+    // 10) Count total documents for pagination metadata
     const total = await expenses.countDocuments(filter);
 
+    // 11) Query with sorting, skip, limit
     const cursor = expenses
       .find(filter)
       .sort({ date: -1 })
@@ -164,6 +164,7 @@ const getAllExpensesImpl: APIGatewayProxyHandler = async (event) => {
 
     const docs = await cursor.toArray();
 
+    // 12) Normalize output documents into lightweight DTOs
     const items = docs.map((d: any) => ({
       id: String(d._id),
       userId: d.userId ? String(d.userId) : null,
@@ -176,6 +177,7 @@ const getAllExpensesImpl: APIGatewayProxyHandler = async (event) => {
       createdAt: d.createdAt ? new Date(d.createdAt).toISOString() : null,
     }));
 
+    // 13) Return paginated response
     return jsonResponse(200, {
       total,
       page,

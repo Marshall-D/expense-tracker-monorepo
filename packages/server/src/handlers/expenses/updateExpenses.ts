@@ -1,15 +1,12 @@
 // packages/server/src/handlers/updateExpenses.ts
+
 /**
  * PUT /api/expenses/{id}
  *
- * Responsibilities:
- *  - Validate path id is present and is a valid ObjectId
- *  - Validate request body (updateExpenseSchema)
- *  - Resolve category/categoryId appropriately (validate category exists and is accessible)
- *  - Build $set payload and run findOneAndUpdate returning the updated document
- *
- * Behaviour preserved from original implementation. Uses central jsonResponse and
- * emptyOptionsResponse helpers for consistent CORS+JSON responses.
+ * - Validates path id
+ * - Validates request body with updateExpenseSchema
+ * - Resolves category/categoryId updates and builds a $set payload
+ * - Performs findOneAndUpdate and returns updated document
  */
 
 import type { APIGatewayProxyHandler } from "aws-lambda";
@@ -21,13 +18,14 @@ import { ObjectId } from "mongodb";
 import { updateExpenseSchema } from "../../lib/validators";
 
 const updateExpensesImpl: APIGatewayProxyHandler = async (event) => {
-  // Handle CORS preflight
+  // 1) Preflight
   if (event.httpMethod === "OPTIONS") return emptyOptionsResponse();
 
+  // 2) Auth
   const userId = (event.requestContext as any)?.authorizer?.userId;
   if (!userId) return jsonResponse(401, { error: "unauthorized" });
 
-  // path param id resolution (accept id, ID, _id)
+  // 3) Path param id resolution
   const pathParams = (event.pathParameters || {}) as Record<
     string,
     string | undefined
@@ -39,7 +37,7 @@ const updateExpensesImpl: APIGatewayProxyHandler = async (event) => {
       message: "Expense id is required in path.",
     });
 
-  // validate ObjectId
+  // 4) Validate ObjectId
   let expenseObjectId: ObjectId;
   try {
     expenseObjectId = new ObjectId(id);
@@ -50,11 +48,12 @@ const updateExpensesImpl: APIGatewayProxyHandler = async (event) => {
     });
   }
 
-  // validate request body
+  // 5) Validate request body using parseAndValidate + schema
   const parsed = parseAndValidate(updateExpenseSchema, event);
   if (!parsed.ok) return parsed.response;
   const updates = parsed.data as any;
 
+  // 6) Ensure at least one field provided
   if (!updates || Object.keys(updates).length === 0) {
     return jsonResponse(400, {
       error: "no_updates",
@@ -62,6 +61,7 @@ const updateExpensesImpl: APIGatewayProxyHandler = async (event) => {
     });
   }
 
+  // 7) DB handle
   const db = await getDb();
   if (!db)
     return jsonResponse(503, {
@@ -73,7 +73,7 @@ const updateExpensesImpl: APIGatewayProxyHandler = async (event) => {
     const expenses = db.collection("expenses");
     const categoriesColl = db.collection("categories");
 
-    // Build set payload (immutability: create a new object)
+    // 8) Build immutable setPayload object for $set
     const setPayload: any = {};
 
     if (typeof updates.amount !== "undefined")
@@ -85,12 +85,13 @@ const updateExpensesImpl: APIGatewayProxyHandler = async (event) => {
     if (typeof updates.date !== "undefined")
       setPayload.date = updates.date ? new Date(updates.date) : null;
 
-    // handle categoryId explicit update (can be null to remove)
+    // 9) Handle categoryId explicit update (can be null to clear)
     if (typeof updates.categoryId !== "undefined") {
       if (updates.categoryId === null) {
         setPayload.categoryId = null;
         setPayload.category = "Uncategorized";
       } else {
+        // Validate provided categoryId and accessibility
         try {
           const cid = new ObjectId(updates.categoryId);
           const cat = await categoriesColl.findOne({
@@ -113,7 +114,7 @@ const updateExpensesImpl: APIGatewayProxyHandler = async (event) => {
         }
       }
     } else if (typeof updates.category !== "undefined") {
-      // category name update (try to resolve user-specific or global)
+      // 10) Category name update: try to resolve user-specific or global
       const cat =
         (await categoriesColl.findOne({
           name: updates.category,
@@ -128,20 +129,23 @@ const updateExpensesImpl: APIGatewayProxyHandler = async (event) => {
         setPayload.categoryId = cat._id;
         setPayload.category = cat.name;
       } else {
-        // unknown category name: keep string and clear categoryId
+        // Unknown category name: store string and clear categoryId
         setPayload.categoryId = null;
         setPayload.category = updates.category;
       }
     }
 
+    // 11) Always set updatedAt timestamp
     setPayload.updatedAt = new Date();
 
+    // 12) Perform findOneAndUpdate returning the updated document
     const result = await expenses.findOneAndUpdate(
       { _id: expenseObjectId, userId: new ObjectId(userId) },
       { $set: setPayload },
-      { returnDocument: "after" }
+      { returnDocument: "after" },
     );
 
+    // 13) If no value, expense not found -> 404
     if (!result.value) {
       return jsonResponse(404, {
         error: "not_found",
@@ -149,6 +153,7 @@ const updateExpensesImpl: APIGatewayProxyHandler = async (event) => {
       });
     }
 
+    // 14) Normalize updated document into response payload
     const updated = result.value;
     const responseBody = {
       id: String(updated._id),
@@ -167,6 +172,7 @@ const updateExpensesImpl: APIGatewayProxyHandler = async (event) => {
         : null,
     };
 
+    // 15) Return updated resource
     return jsonResponse(200, { data: responseBody });
   } catch (err) {
     console.error("updateExpenses error:", err);

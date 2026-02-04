@@ -1,18 +1,17 @@
 // packages/client/src/hooks/useRegister.ts
+
 import {
   useMutation,
   useQueryClient,
   UseMutationResult,
 } from "@tanstack/react-query";
-
 import { registerApi } from "@/services";
 import { useAuth } from "@/context";
 import type { RegisterPayload, AuthResponse } from "@/types/auth";
 import { t } from "@/lib";
 
 /**
- * useRegister
- * - returns a properly typed mutation result
+ * useRegister - similar to login: on success setAuth + invalidates + welcome toast
  */
 export function useRegister(): UseMutationResult<
   AuthResponse,
@@ -28,12 +27,9 @@ export function useRegister(): UseMutationResult<
     onSuccess(data) {
       setAuth(data.user, data.token);
       qc.setQueryData(["me"], data.user);
-
       qc.invalidateQueries({ queryKey: ["expenses"] });
       qc.invalidateQueries({ queryKey: ["budgets"] });
       qc.invalidateQueries({ queryKey: ["categories"] });
-
-      // show welcome toast on successful registration/login
       const name = (data && data.user && (data.user as any).name) || "there";
       t.success(`Welcome, ${name}!`);
     },

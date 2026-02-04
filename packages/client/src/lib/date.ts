@@ -1,14 +1,9 @@
-/**
- * packages/client/src/lib/date.ts
- *
- * Small focused date utilities used by reports/exports.
- */
-
+// packages/client/src/lib/date.ts
 import { format } from "date-fns";
 
 /**
- * Convert an ISO month string "YYYY-MM" into a human label "Jan 2026".
- * Returns a readable fallback on error.
+ * monthLabel("2026-01") -> "Jan 2026"
+ * Returns "—" when input null/invalid.
  */
 export function monthLabel(isoMonth: string | null): string {
   if (!isoMonth) return "—";
@@ -22,7 +17,7 @@ export function monthLabel(isoMonth: string | null): string {
 }
 
 /**
- * Short month label "MMM" for compact selectors.
+ * monthShort("2026-01") -> "Jan"
  */
 export function monthShort(isoMonth: string | null): string {
   if (!isoMonth) return "—";
@@ -36,19 +31,16 @@ export function monthShort(isoMonth: string | null): string {
 }
 
 /**
- * Convert an ISO month "YYYY-MM" to a canonical inclusive start -> end range string pair
- * suitable for server query params (YYYY-MM-DD).
- *
- * Returned tuple: [from, to]
- *
- * Note: end is the last day of the month (yyyy-mm-dd).
+ * monthToRange("2026-01") => ["2026-01-01", "2026-01-31"]
+ * - start is first day of month (UTC)
+ * - end is last day of month (UTC)
  */
 export function monthToRange(isoMonth: string): [string, string] {
   const [y, m] = isoMonth.split("-");
   const year = Number(y);
   const month = Number(m) - 1;
   const start = new Date(Date.UTC(year, month, 1, 0, 0, 0));
-  // last day of month: using day 0 of next month yields last day of current month
+  // day 0 of next month -> last day of given month
   const end = new Date(Date.UTC(year, month + 1, 0, 0, 0, 0));
   return [format(start, "yyyy-MM-dd"), format(end, "yyyy-MM-dd")];
 }

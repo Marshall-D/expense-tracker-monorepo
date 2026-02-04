@@ -1,12 +1,11 @@
 // packages/server/src/handlers/getAllCategories.ts
+
 /**
  * GET /api/categories
  *
  * Responsibilities:
- *  - Return both global and user-specific categories for the authenticated user
- *  - Sort: user-owned first (userId desc), then by name
- *
- * Behaviour preserved. Uses centralized jsonResponse/emptyOptionsResponse.
+ *  - Return both global and user-specific categories visible to the user
+ *  - Sort user-owned categories first, then by name (ascending)
  */
 
 import type { APIGatewayProxyHandler } from "aws-lambda";
@@ -16,11 +15,14 @@ import { getDb } from "../../lib/mongo";
 import { ObjectId } from "mongodb";
 
 const getAllCategoriesImpl: APIGatewayProxyHandler = async (event) => {
+  // Preflight
   if (event.httpMethod === "OPTIONS") return emptyOptionsResponse();
 
+  // Auth
   const userId = (event.requestContext as any)?.authorizer?.userId;
   if (!userId) return jsonResponse(401, { error: "unauthorized" });
 
+  // DB handle
   const db = await getDb();
   if (!db)
     return jsonResponse(503, {
@@ -31,12 +33,14 @@ const getAllCategoriesImpl: APIGatewayProxyHandler = async (event) => {
   try {
     const categories = db.collection("categories");
 
-    // fetch global (userId: null) and user-specific
+    // Fetch categories that are either global (userId: null) or owned by this user
+    // Sort: user-owned first (userId: -1) then by name ascending
     const cursor = categories
       .find({ $or: [{ userId: null }, { userId: new ObjectId(userId) }] })
       .sort({ userId: -1, name: 1 });
     const docs = await cursor.toArray();
 
+    // Normalize documents returned to the client-friendly shape
     const items = docs.map((d: any) => ({
       id: String(d._id),
       name: d.name,

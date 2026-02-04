@@ -1,7 +1,10 @@
 // packages/client/src/lib/storage.ts
+
+// keys used for localStorage to version values if needed later
 export const TOKEN_KEY = "luxe_token_v1";
 export const USER_KEY = "luxe_user_v1";
 
+/* token helpers (try/catch to avoid exceptions in privacy mode) */
 export function setToken(token: string) {
   try {
     localStorage.setItem(TOKEN_KEY, token);
@@ -22,6 +25,7 @@ export function removeToken() {
   } catch {}
 }
 
+/* user helpers store JSON-serialized user object */
 export function setUser(user: any) {
   try {
     localStorage.setItem(USER_KEY, JSON.stringify(user));

@@ -1,4 +1,5 @@
 // packages/client/src/layouts/dashboardLayout.tsx
+
 import React, { useState, useEffect } from "react";
 import { NavLink, Link, Outlet } from "react-router-dom";
 import {
@@ -19,7 +20,10 @@ import { useAuth } from "@/context";
 import { queryKeys } from "@/lib";
 import * as categoryService from "@/services";
 
-// navItems: mark Dashboard with `end: true` so it's only active on exact /dashboard
+/**
+ * navItems defines the left nav entries.
+ * `end: true` used for Dashboard so it's active only on exact path.
+ */
 const navItems = [
   { name: "Dashboard", to: ROUTES.DASHBOARD, icon: LayoutDashboard, end: true },
   { name: "Expenses", to: ROUTES.EXPENSES, icon: ReceiptText },
@@ -28,6 +32,10 @@ const navItems = [
   { name: "Reports", to: ROUTES.REPORTS, icon: BarChart3 },
 ];
 
+/**
+ * NavItem - small presentational wrapper for NavLink with icon + label
+ * - accepts `end` to control exact matching
+ */
 function NavItem({
   to,
   icon: Icon,
@@ -60,25 +68,32 @@ function NavItem({
   );
 }
 
+/**
+ * DashboardLayout - top-level app layout for authenticated pages
+ * - renders desktop aside nav + header + mobile drawer + bottom nav
+ * - prefetches categories on mount so adding expenses is fast
+ */
 export function DashboardLayout(): JSX.Element {
+  // mobile drawer open state
   const [open, setOpen] = useState(false);
   const handleNavigate = () => setOpen(false);
 
+  // auth helpers + react-query client
   const { user, logout } = useAuth();
   const qc = useQueryClient();
 
-  // Prefetch categories once when layout mounts (so Add form is instant)
+  // prefetch categories on mount so Add Expense form is instant
   useEffect(() => {
     qc.prefetchQuery({
       queryKey: [queryKeys.categories, { includeGlobal: true }],
       queryFn: () => categoryService.fetchCategories(true),
     }).catch(() => {});
-    // run on mount only
-     
+    // empty deps => run once on mount
   }, []);
 
   return (
     <div className="flex min-h-screen bg-background">
+      {/* Desktop sidebar (hidden on small screens) */}
       <aside className="w-64 border-r border-border/40 hidden md:flex flex-col sticky top-0 h-screen bg-card/30 backdrop-blur-md">
         <div className="p-6">
           <Link to={ROUTES.DASHBOARD} className="flex items-center gap-2">
@@ -107,9 +122,12 @@ export function DashboardLayout(): JSX.Element {
         </div>
       </aside>
 
+      {/* Main column */}
       <div className="flex-1 flex flex-col min-w-0">
+        {/* Top header */}
         <header className="h-16 border-b border-border/40 flex items-center justify-between px-4 md:px-8 bg-background/50 backdrop-blur-sm sticky top-0 z-30">
           <div className="flex items-center gap-3">
+            {/* mobile menu toggle */}
             <button
               aria-label="Open menu"
               onClick={() => setOpen(true)}
@@ -129,7 +147,7 @@ export function DashboardLayout(): JSX.Element {
               Welcome back, {user?.name ?? "Guest"}
             </p>
 
-            {/* Add Expense -> prefetch categories on hover for extra speed */}
+            {/* Add Expense button prefetches categories on hover to speed the modal/form */}
             <Button asChild size="sm" className="rounded-full px-4">
               <Link
                 to={ROUTES.EXPENSES_NEW}
@@ -146,7 +164,7 @@ export function DashboardLayout(): JSX.Element {
           </div>
         </header>
 
-        {/* Off-canvas mobile drawer */}
+        {/* Mobile drawer (off-canvas) */}
         <div
           aria-hidden={!open}
           className={`fixed inset-0 z-40 md:hidden transition-opacity ${
@@ -161,7 +179,7 @@ export function DashboardLayout(): JSX.Element {
             onClick={() => setOpen(false)}
           />
 
-          {/* panel */}
+          {/* slide-in panel */}
           <nav
             className={`absolute left-0 top-0 bottom-0 w-72 bg-card/90 backdrop-blur-md border-r border-border/40 transform transition-transform ${
               open ? "translate-x-0" : "-translate-x-full"
@@ -221,10 +239,12 @@ export function DashboardLayout(): JSX.Element {
           </nav>
         </div>
 
+        {/* Main content */}
         <main className="p-4 md:p-8 overflow-y-auto">
           <Outlet />
         </main>
 
+        {/* Mobile bottom nav (small screens only) */}
         <nav className="fixed bottom-4 left-4 right-4 md:hidden z-40">
           <div className="mx-auto max-w-3xl bg-card/80 backdrop-blur-md border border-border/40 rounded-full px-2 py-2 flex justify-between items-center shadow-lg">
             {navItems.map((item) => {

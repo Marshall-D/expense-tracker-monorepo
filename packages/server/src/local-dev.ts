@@ -1,103 +1,164 @@
+// local-dev.ts is an Express-based local server that mounts the same AWS Lambda-style handler functions used in production.
+//  It converts incoming Express requests into an API Gateway-like event object, calls the Lambda handler, then converts the handler’s APIGatewayProxyResult back into an Express response.
+//  This gives local dev parity with production handler logic while still allowing fast iteration with ts-node-dev.
+
+// local-dev.ts
+// Local Express harness that adapts HTTP requests to the same Lambda handlers
+// used in production. This file is executed during local development to provide
+// parity between local and deployed behavior.
+
+// Load environment variables from packages/server/.env (dotenv/config auto-run)
 import "dotenv/config";
+
 import type { APIGatewayProxyResult } from "aws-lambda";
 import express, { Request, Response } from "express";
 import bodyParser from "body-parser";
 import cors from "cors";
 
+// Import Lambda-style handlers (these are the same functions deployed to AWS).
+// Each handler follows the handler(event, context, callback) signature.
 import { handler as healthHandler } from "./handlers/health";
 import { register as authRegister, login } from "./handlers/auth";
-// Expenses
+
+// Expenses handlers (create, get all, get single, update, delete)
 import { handler as createExpenseHandler } from "./handlers/expenses/createExpenses";
 import { handler as getAllExpensesHandler } from "./handlers/expenses/getAllExpenses";
 import { handler as getExpenseHandler } from "./handlers/expenses/getExpense";
 import { handler as updateExpensesHandler } from "./handlers/expenses/updateExpenses";
 import { handler as deleteExpenseHandler } from "./handlers/expenses/deleteExpense";
 
-// Categories
+// Categories handlers
 import { handler as createCategoryHandler } from "./handlers/categories/createCategories";
 import { handler as getAllCategoriesHandler } from "./handlers/categories/getAllCategories";
 import { handler as getCategoryHandler } from "./handlers/categories/getCategory";
 import { handler as updateCategoriesHandler } from "./handlers/categories/updateCategories";
 import { handler as deleteCategoryHandler } from "./handlers/categories/deleteCategory";
 
-// Budgets
+// Budgets handlers
 import { handler as createBudgetHandler } from "./handlers/budgets/createBudget";
 import { handler as getAllBudgetsHandler } from "./handlers/budgets/getAllBudgets";
 import { handler as getBudgetHandler } from "./handlers/budgets/getBudget";
 import { handler as updateBudgetHandler } from "./handlers/budgets/updateBudget";
 import { handler as deleteBudgetHandler } from "./handlers/budgets/deleteBudget";
 
-// Reports
+// Reports handlers
 import { handler as reportsMonthlyHandler } from "./handlers/reports/monthlyReports";
 import { handler as reportsByCategoryHandler } from "./handlers/reports/categoryReports";
 import { handler as reportsTrendsHandler } from "./handlers/reports/trendReports";
 import { handler as expensesExportHandler } from "./handlers/reports/expensesReport";
 
+// Utility to assert required env vars are present (throws / exits for missing)
 import { assertEnv } from "./lib/env";
 
-// ensure required runtime envs are present for local dev
+/* ----------------------
+   runtime sanity checks
+   ---------------------- */
+// Ensure required runtime env variables are set for local dev.
+// If missing, assertEnv should exit/throw with a useful message.
 assertEnv("MONGO_URI", "Set MONGO_URI in packages/server/.env or SSM");
 assertEnv("JWT_SECRET", "Set JWT_SECRET in packages/server/.env or SSM");
 
+/* ----------------------
+   express app setup
+   ---------------------- */
 const app = express();
-app.use(bodyParser.json());
-app.use(cors()); // allow CORS for local dev
 
+// Parse incoming JSON bodies into req.body
+app.use(bodyParser.json());
+
+// Use CORS for local dev so the client (often served from another port) can call the API.
+app.use(cors());
+
+// Standard CORS headers used when we manually respond to OPTIONS or set headers explicitly.
 const CORS_HEADERS = {
   "Content-Type": "application/json",
-  // allow all local dev origins — matches serverless CORS config
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": "*", // Allow all origins for local dev (note: relax in prod)
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
   "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
-};
+} as Record<string, string>;
 
-// helper: convert express request -> APIGateway event-like object
+/* ----------------------
+   helpers: conversion between Express <-> API Gateway
+   ---------------------- */
+
+/**
+ * Convert an Express Request into a shape resembling API Gateway's event.
+ * Lambda handlers expect an `event` with properties like httpMethod, path,
+ * headers, queryStringParameters and stringified body.
+ */
 function toApiGatewayEvent(req: Request) {
   return {
     httpMethod: req.method,
     path: req.path,
     headers: req.headers,
-    queryStringParameters: req.query as Record<string, string> | null,
+    // API Gateway uses a flat map for query string params; convert accordingly.
+    queryStringParameters:
+      Object.keys(req.query).length > 0
+        ? (req.query as Record<string, string>)
+        : null,
+    // Handler expects a string body; stringify if it's an object, otherwise empty string.
     body:
       req.body && Object.keys(req.body).length ? JSON.stringify(req.body) : "",
     requestContext: {
-      identity: { sourceIp: req.ip },
+      identity: { sourceIp: req.ip }, // provide some request context (useful for logs)
     },
   } as any;
 }
 
-// helper: convert APIGatewayProxyResult -> express response
+/**
+ * Convert an APIGatewayProxyResult (what the Lambda returns) into an Express response.
+ * This function handles setting headers (including CORS) and parsing JSON bodies.
+ */
 function sendApiResponse(res: Response, result: APIGatewayProxyResult | void) {
+  // If handler returned nothing, treat it as an internal error.
   if (!result) {
     return res.status(500).json({ error: "handler_returned_no_response" });
   }
+
+  // Standardize status code and headers
   const statusCode = result.statusCode ?? 200;
   const headers = (result.headers as Record<string, string>) ?? {};
-  // Ensure CORS header present
+
+  // Ensure CORS header present and merge with handler headers
   res.set({ "Access-Control-Allow-Origin": "*", ...headers } as any);
-  // if body is JSON string already, try to parse for pretty response
+
   const body = result.body ?? "";
-  // If content-type indicates JSON, send parsed; else send raw
+
+  // Determine content type (case-insensitive)
   const contentType =
     headers["Content-Type"] ?? headers["content-type"] ?? "application/json";
+
+  // If JSON, try to parse for prettier response objects; otherwise send raw body.
   if (contentType.includes("application/json")) {
     try {
       return res.status(statusCode).send(JSON.parse(body as string));
     } catch {
+      // if parsing fails (body is plain string), send it raw
       return res.status(statusCode).send(body);
     }
   }
+
+  // Non-JSON (e.g., text/csv or binary) — send as-is
   return res.status(statusCode).send(body);
 }
 
-// Health route (existing)
+/* ----------------------
+   route bindings
+   ---------------------- */
+
+/**
+ * HEALTH CHECK
+ * This route calls the health Lambda handler and forwards its response.
+ */
 app.get("/api/health", async (_req, res) => {
   try {
+    // Lambda-style handlers have signature (event, context, callback)
     const result = (await healthHandler(
       {} as any,
       {} as any,
-      () => null
+      () => null,
     )) as APIGatewayProxyResult | void;
+
     return sendApiResponse(res, result);
   } catch (err) {
     console.error("local-dev health handler error", err);
@@ -105,14 +166,16 @@ app.get("/api/health", async (_req, res) => {
   }
 });
 
-// Auth register route (POST)
+/* AUTH routes */
+
+// Register user
 app.post("/api/auth/register", async (req, res) => {
   try {
     const event = toApiGatewayEvent(req);
     const result = (await authRegister(
       event as any,
       {} as any,
-      () => null
+      () => null,
     )) as APIGatewayProxyResult | void;
     return sendApiResponse(res, result);
   } catch (err) {
@@ -121,13 +184,14 @@ app.post("/api/auth/register", async (req, res) => {
   }
 });
 
+// Login
 app.post("/api/auth/login", async (req, res) => {
   try {
     const event = toApiGatewayEvent(req);
     const result = (await login(
       event as any,
       {} as any,
-      () => null
+      () => null,
     )) as APIGatewayProxyResult | void;
     return sendApiResponse(res, result);
   } catch (err) {
@@ -136,14 +200,16 @@ app.post("/api/auth/login", async (req, res) => {
   }
 });
 
-// Expenses create route (POST) - uses the same APIGateway handler pattern
+/* EXPENSES routes */
+
+// Create expense
 app.post("/api/expenses", async (req, res) => {
   try {
     const event = toApiGatewayEvent(req);
     const result = (await createExpenseHandler(
       event as any,
       {} as any,
-      () => null
+      () => null,
     )) as APIGatewayProxyResult | void;
     return sendApiResponse(res, result);
   } catch (err) {
@@ -152,15 +218,15 @@ app.post("/api/expenses", async (req, res) => {
   }
 });
 
-// GET /api/expenses (list) - uses APIGateway-style handler
+// List all expenses
 app.get("/api/expenses", async (req, res) => {
   try {
     const event = toApiGatewayEvent(req);
     const result = (await getAllExpensesHandler(
       event as any,
       {} as any,
-      () => null
-    )) as any;
+      () => null,
+    )) as APIGatewayProxyResult | void;
     return sendApiResponse(res, result);
   } catch (err) {
     console.error("local-dev expenses.getAll handler error", err);
@@ -168,16 +234,17 @@ app.get("/api/expenses", async (req, res) => {
   }
 });
 
-// PUT /api/expenses/:id (update)
+// Update expense by id
 app.put("/api/expenses/:id", async (req, res) => {
   try {
     const event = toApiGatewayEvent(req);
+    // API Gateway passes pathParameters; emulating that here:
     (event as any).pathParameters = req.params || {};
     const result = (await updateExpensesHandler(
       event as any,
       {} as any,
-      () => null
-    )) as any;
+      () => null,
+    )) as APIGatewayProxyResult | void;
     return sendApiResponse(res, result);
   } catch (err) {
     console.error("local-dev expenses.update handler error", err);
@@ -185,7 +252,7 @@ app.put("/api/expenses/:id", async (req, res) => {
   }
 });
 
-// DELETE /api/expenses/:id (delete)
+// Delete expense by id
 app.delete("/api/expenses/:id", async (req, res) => {
   try {
     const event = toApiGatewayEvent(req);
@@ -193,8 +260,8 @@ app.delete("/api/expenses/:id", async (req, res) => {
     const result = (await deleteExpenseHandler(
       event as any,
       {} as any,
-      () => null
-    )) as any;
+      () => null,
+    )) as APIGatewayProxyResult | void;
     return sendApiResponse(res, result);
   } catch (err) {
     console.error("local-dev expenses.delete handler error", err);
@@ -202,7 +269,7 @@ app.delete("/api/expenses/:id", async (req, res) => {
   }
 });
 
-// GET /api/expenses/:id (get single expense)
+// Get a single expense by id
 app.get("/api/expenses/:id", async (req, res) => {
   try {
     const event = toApiGatewayEvent(req);
@@ -210,7 +277,7 @@ app.get("/api/expenses/:id", async (req, res) => {
     const result = (await getExpenseHandler(
       event as any,
       {} as any,
-      () => null
+      () => null,
     )) as APIGatewayProxyResult | void;
     return sendApiResponse(res, result);
   } catch (err) {
@@ -219,14 +286,15 @@ app.get("/api/expenses/:id", async (req, res) => {
   }
 });
 
-// POST /api/categories
+/* CATEGORIES routes (create, list, get, update, delete) */
+
 app.post("/api/categories", async (req, res) => {
   try {
     const event = toApiGatewayEvent(req);
     const result = (await createCategoryHandler(
       event as any,
       {} as any,
-      () => null
+      () => null,
     )) as APIGatewayProxyResult | void;
     return sendApiResponse(res, result);
   } catch (err) {
@@ -235,14 +303,13 @@ app.post("/api/categories", async (req, res) => {
   }
 });
 
-// GET /api/categories
 app.get("/api/categories", async (req, res) => {
   try {
     const event = toApiGatewayEvent(req);
     const result = (await getAllCategoriesHandler(
       event as any,
       {} as any,
-      () => null
+      () => null,
     )) as APIGatewayProxyResult | void;
     return sendApiResponse(res, result);
   } catch (err) {
@@ -251,7 +318,6 @@ app.get("/api/categories", async (req, res) => {
   }
 });
 
-// GET /api/categories/:id
 app.get("/api/categories/:id", async (req, res) => {
   try {
     const event = toApiGatewayEvent(req);
@@ -259,7 +325,7 @@ app.get("/api/categories/:id", async (req, res) => {
     const result = (await getCategoryHandler(
       event as any,
       {} as any,
-      () => null
+      () => null,
     )) as APIGatewayProxyResult | void;
     return sendApiResponse(res, result);
   } catch (err) {
@@ -268,7 +334,6 @@ app.get("/api/categories/:id", async (req, res) => {
   }
 });
 
-// PUT /api/categories/:id
 app.put("/api/categories/:id", async (req, res) => {
   try {
     const event = toApiGatewayEvent(req);
@@ -276,7 +341,7 @@ app.put("/api/categories/:id", async (req, res) => {
     const result = (await updateCategoriesHandler(
       event as any,
       {} as any,
-      () => null
+      () => null,
     )) as APIGatewayProxyResult | void;
     return sendApiResponse(res, result);
   } catch (err) {
@@ -285,7 +350,6 @@ app.put("/api/categories/:id", async (req, res) => {
   }
 });
 
-// DELETE /api/categories/:id
 app.delete("/api/categories/:id", async (req, res) => {
   try {
     const event = toApiGatewayEvent(req);
@@ -293,7 +357,7 @@ app.delete("/api/categories/:id", async (req, res) => {
     const result = (await deleteCategoryHandler(
       event as any,
       {} as any,
-      () => null
+      () => null,
     )) as APIGatewayProxyResult | void;
     return sendApiResponse(res, result);
   } catch (err) {
@@ -302,7 +366,10 @@ app.delete("/api/categories/:id", async (req, res) => {
   }
 });
 
-// generic fallback for OPTIONS preflight for various endpoints
+/* OPTIONS preflight handling
+   Many browsers issue OPTIONS preflight requests for CORS. This middleware
+   intercepts OPTIONS and responds with CORS headers so the real request can proceed.
+*/
 app.use((req, res, next) => {
   if (req.method === "OPTIONS") {
     res
@@ -314,14 +381,15 @@ app.use((req, res, next) => {
   next();
 });
 
-// POST /api/budgets
+/* BUDGETS routes */
+
 app.post("/api/budgets", async (req, res) => {
   try {
     const event = toApiGatewayEvent(req);
     const result = (await createBudgetHandler(
       event as any,
       {} as any,
-      () => null
+      () => null,
     )) as APIGatewayProxyResult | void;
     return sendApiResponse(res, result);
   } catch (err) {
@@ -330,15 +398,14 @@ app.post("/api/budgets", async (req, res) => {
   }
 });
 
-// GET /api/budgets
 app.get("/api/budgets", async (req, res) => {
   try {
     const event = toApiGatewayEvent(req);
     const result = (await getAllBudgetsHandler(
       event as any,
       {} as any,
-      () => null
-    )) as any;
+      () => null,
+    )) as APIGatewayProxyResult | void;
     return sendApiResponse(res, result);
   } catch (err) {
     console.error("local-dev budgets.getAll handler error", err);
@@ -346,7 +413,6 @@ app.get("/api/budgets", async (req, res) => {
   }
 });
 
-// GET /api/budgets/:id
 app.get("/api/budgets/:id", async (req, res) => {
   try {
     const event = toApiGatewayEvent(req);
@@ -354,7 +420,7 @@ app.get("/api/budgets/:id", async (req, res) => {
     const result = (await getBudgetHandler(
       event as any,
       {} as any,
-      () => null
+      () => null,
     )) as APIGatewayProxyResult | void;
     return sendApiResponse(res, result);
   } catch (err) {
@@ -363,7 +429,6 @@ app.get("/api/budgets/:id", async (req, res) => {
   }
 });
 
-// PUT /api/budgets/:id
 app.put("/api/budgets/:id", async (req, res) => {
   try {
     const event = toApiGatewayEvent(req);
@@ -371,8 +436,8 @@ app.put("/api/budgets/:id", async (req, res) => {
     const result = (await updateBudgetHandler(
       event as any,
       {} as any,
-      () => null
-    )) as any;
+      () => null,
+    )) as APIGatewayProxyResult | void;
     return sendApiResponse(res, result);
   } catch (err) {
     console.error("local-dev budgets.update handler error", err);
@@ -380,71 +445,6 @@ app.put("/api/budgets/:id", async (req, res) => {
   }
 });
 
-// GET /api/reports/monthly
-app.get("/api/reports/monthly", async (req, res) => {
-  try {
-    const event = toApiGatewayEvent(req);
-    const result = (await reportsMonthlyHandler(
-      event as any,
-      {} as any,
-      () => null
-    )) as any;
-    return sendApiResponse(res, result);
-  } catch (err) {
-    console.error("local-dev reports.monthly handler error", err);
-    return res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// GET /api/reports/by-category
-app.get("/api/reports/by-category", async (req, res) => {
-  try {
-    const event = toApiGatewayEvent(req);
-    const result = (await reportsByCategoryHandler(
-      event as any,
-      {} as any,
-      () => null
-    )) as any;
-    return sendApiResponse(res, result);
-  } catch (err) {
-    console.error("local-dev reports.byCategory handler error", err);
-    return res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// GET /api/reports/trends
-app.get("/api/reports/trends", async (req, res) => {
-  try {
-    const event = toApiGatewayEvent(req);
-    const result = (await reportsTrendsHandler(
-      event as any,
-      {} as any,
-      () => null
-    )) as any;
-    return sendApiResponse(res, result);
-  } catch (err) {
-    console.error("local-dev reports.trends handler error", err);
-    return res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// GET /api/export/expenses
-app.get("/api/export/expenses", async (req, res) => {
-  try {
-    const event = toApiGatewayEvent(req);
-    const result = (await expensesExportHandler(
-      event as any,
-      {} as any,
-      () => null
-    )) as any;
-    return sendApiResponse(res, result);
-  } catch (err) {
-    console.error("local-dev expenses.export handler error", err);
-    return res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// DELETE /api/budgets/:id
 app.delete("/api/budgets/:id", async (req, res) => {
   try {
     const event = toApiGatewayEvent(req);
@@ -452,8 +452,8 @@ app.delete("/api/budgets/:id", async (req, res) => {
     const result = (await deleteBudgetHandler(
       event as any,
       {} as any,
-      () => null
-    )) as any;
+      () => null,
+    )) as APIGatewayProxyResult | void;
     return sendApiResponse(res, result);
   } catch (err) {
     console.error("local-dev budgets.delete handler error", err);
@@ -461,7 +461,72 @@ app.delete("/api/budgets/:id", async (req, res) => {
   }
 });
 
+/* REPORTS and EXPORTS */
+
+app.get("/api/reports/monthly", async (req, res) => {
+  try {
+    const event = toApiGatewayEvent(req);
+    const result = (await reportsMonthlyHandler(
+      event as any,
+      {} as any,
+      () => null,
+    )) as APIGatewayProxyResult | void;
+    return sendApiResponse(res, result);
+  } catch (err) {
+    console.error("local-dev reports.monthly handler error", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.get("/api/reports/by-category", async (req, res) => {
+  try {
+    const event = toApiGatewayEvent(req);
+    const result = (await reportsByCategoryHandler(
+      event as any,
+      {} as any,
+      () => null,
+    )) as APIGatewayProxyResult | void;
+    return sendApiResponse(res, result);
+  } catch (err) {
+    console.error("local-dev reports.byCategory handler error", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.get("/api/reports/trends", async (req, res) => {
+  try {
+    const event = toApiGatewayEvent(req);
+    const result = (await reportsTrendsHandler(
+      event as any,
+      {} as any,
+      () => null,
+    )) as APIGatewayProxyResult | void;
+    return sendApiResponse(res, result);
+  } catch (err) {
+    console.error("local-dev reports.trends handler error", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.get("/api/export/expenses", async (req, res) => {
+  try {
+    const event = toApiGatewayEvent(req);
+    const result = (await expensesExportHandler(
+      event as any,
+      {} as any,
+      () => null,
+    )) as APIGatewayProxyResult | void;
+    return sendApiResponse(res, result);
+  } catch (err) {
+    console.error("local-dev expenses.export handler error", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/* ----------------------
+   start server
+   ---------------------- */
 const port = Number(process.env.PORT || 3000);
-app.listen(port, () =>
-  console.log("Local server running on http://localhost:" + port)
-);
+app.listen(port, () => {
+  console.log("Local server running on http://localhost:" + port);
+});

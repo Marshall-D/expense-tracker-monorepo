@@ -1,17 +1,13 @@
 // packages/server/src/handlers/trendReports.ts
+
 /**
  * Trends report handler — returns totals per month for the requested recent months.
  *
- * Responsibility:
- *  - Validate query (months)
- *  - Compute start date
- *  - Run aggregation over expenses collection
- *  - Reformat results into ordered array with totals per currency
- *
- * Notes:
- *  - Wrapped with requireAuth so requestContext.authorizer.userId is available.
- *  - Uses shared helpers: parseQuery (for query validation) and jsonResponse (consistent responses).
- *  - Behaviour preserved exactly from original implementation.
+ * Responsibilities:
+ *  - Validate `months` query param (default to 6)
+ *  - Cap months between 1 and 24
+ *  - Compute start month (UTC) and aggregate totals per month/currency
+ *  - Return an ordered array of month objects with totals for USD and NGN
  */
 
 import type { APIGatewayProxyHandler } from "aws-lambda";
@@ -22,6 +18,7 @@ import { z } from "zod";
 import { ObjectId } from "mongodb";
 import { parseQuery } from "../../lib/query";
 
+/* Query schema: months is optional string; transform to Number, default will be handled */
 const querySchema = z.object({
   months: z
     .string()
@@ -29,26 +26,31 @@ const querySchema = z.object({
     .transform((v) => (v ? Number(v) : 6)),
 });
 
+/* Core implementation */
 const reportsTrendsImpl: APIGatewayProxyHandler = async (event) => {
-  // Preflight
+  // Preflight handling
   if (event.httpMethod === "OPTIONS") return emptyOptionsResponse();
 
-  // Auth guaranteed by wrapper, but still check presence to keep handler resilient.
+  // Auth guaranteed by requireAuth, but we still read the userId and return 401 if missing.
   const userId = (event.requestContext as any)?.authorizer?.userId;
   if (!userId) return jsonResponse(401, { error: "unauthorized" });
 
-  // Parse and validate querystring
+  // Parse and validate query parameters
   const parsedQs = parseQuery(querySchema, event);
   if (!parsedQs.ok) return parsedQs.response;
-  const monthsRaw = parsedQs.data.months;
-  const months = Math.max(1, Math.min(24, monthsRaw)); // cap at 24 months
 
-  // Compute inclusive start (UTC month boundary)
+  // Convert months to a bounded integer: minimum 1, maximum 24
+  const monthsRaw = parsedQs.data.months;
+  const months = Math.max(1, Math.min(24, monthsRaw));
+
+  // Compute inclusive start month at UTC month boundary.
+  // Example: for months=6 and today=2026-01-15, start will be 2025-08-01 UTC.
   const now = new Date();
   const start = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1)
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1),
   );
 
+  // Acquire DB
   const db = await getDb();
   if (!db)
     return jsonResponse(503, {
@@ -60,6 +62,10 @@ const reportsTrendsImpl: APIGatewayProxyHandler = async (event) => {
   try {
     const expenses = db.collection("expenses");
 
+    // Aggregation pipeline:
+    // - filter by userId and date >= start
+    // - group by year/month and currency, summing amounts
+    // - sort by year/month ascending
     const pipeline = [
       { $match: { userId: new ObjectId(userId), date: { $gte: start } } },
       {
@@ -77,7 +83,7 @@ const reportsTrendsImpl: APIGatewayProxyHandler = async (event) => {
 
     const agg = await expenses.aggregate(pipeline).toArray();
 
-    // Reformat aggregation into a Map keyed by YYYY-MM to accumulate currency totals
+    // Reformat aggregation into a map keyed by YYYY-MM so we can accumulate USD/NGN totals.
     const map = new Map<
       string,
       { month: string; totalUSD: number; totalNGN: number }
@@ -91,26 +97,27 @@ const reportsTrendsImpl: APIGatewayProxyHandler = async (event) => {
       else if (row._id.currency === "NGN") map.get(key)!.totalNGN += row.total;
     }
 
-    // Ensure months with zero totals are present (ordered starting at `start`)
+    // Build the ordered output array for each month from `start` to `start + months - 1`
     const out: Array<{ month: string; totalUSD: number; totalNGN: number }> =
       [];
     for (let i = 0; i < months; i++) {
       const d = new Date(
-        Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + i, 1)
+        Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + i, 1),
       );
       const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(
         2,
-        "0"
+        "0",
       )}`;
       out.push(
         map.get(key) ?? {
           month: key,
           totalUSD: 0,
           totalNGN: 0,
-        }
+        },
       );
     }
 
+    // Return the ordered months array
     return jsonResponse(200, { months: out });
   } catch (err) {
     console.error("reports.trends error:", err);
@@ -121,4 +128,5 @@ const reportsTrendsImpl: APIGatewayProxyHandler = async (event) => {
   }
 };
 
+// Wrap and export
 export const handler = requireAuth(reportsTrendsImpl);

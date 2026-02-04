@@ -1,16 +1,14 @@
 // packages/client/src/hooks/useBudgetSpending.ts
+/**
+ * useBudgetSpending
+ * - calculates total spent for a budget (category + periodStart)
+ * - composes an expenses fetch and reduces amounts
+ */
 
 import { useQuery } from "@tanstack/react-query";
-
 import * as expensesService from "@/services";
 import { queryKeys } from "@/lib";
 
-/**
- * Hook: useBudgetSpending
- * - Accepts an object identifying the budget period and category.
- * - Returns a react-query result where `data` is the summed spent number.
- *
- */
 type Args = {
   categoryId?: string | null;
   category?: string | null;
@@ -22,16 +20,17 @@ export const useBudgetSpending = ({
   category,
   periodStart,
 }: Args) => {
-  // Normalize periodStart to Date and derive month start/end in UTC
+  // Normalize periodStart -> fromIso / toIso (UTC month boundaries)
   const getRange = (periodStartStr: string) => {
     const maybeIso =
       periodStartStr.length === 7 ? `${periodStartStr}-01` : periodStartStr;
     const p = new Date(maybeIso);
     if (Number.isNaN(p.getTime())) {
+      // fallback to current month range if invalid
       const now = new Date();
       return {
         fromIso: new Date(
-          Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)
+          Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
         ).toISOString(),
         toIso: new Date(
           Date.UTC(
@@ -41,8 +40,8 @@ export const useBudgetSpending = ({
             23,
             59,
             59,
-            999
-          )
+            999,
+          ),
         ).toISOString(),
       };
     }
@@ -70,11 +69,9 @@ export const useBudgetSpending = ({
         to: toIso,
         limit: 1000,
       };
-
       if (categoryId) params.categoryId = categoryId;
       else if (category) params.category = category;
 
-      // fetchExpenses returns the ExpensesListResponse (with .data array)
       const resp = await expensesService.fetchExpenses(params);
       const expenseItems: any[] = Array.isArray((resp as any).data)
         ? (resp as any).data
@@ -82,7 +79,7 @@ export const useBudgetSpending = ({
 
       const spent = expenseItems.reduce(
         (acc, e) => acc + (Number(e.amount) || 0),
-        0
+        0,
       );
       return spent;
     },

@@ -12,6 +12,13 @@
  *
  */
 
+/**
+ * useExpensesPage - state and handlers for the Expenses page.
+ * - reads/writes URL search params (shareable links)
+ * - manages working/applied filters & pagination
+ * - wires delete/export flows
+ */
+
 import { useMemo, useEffect, useState, useCallback } from "react";
 import { format } from "date-fns";
 import { useSearchParams } from "react-router-dom";
@@ -25,10 +32,8 @@ import {
 import { t, downloadResponseAsFile } from "@/lib";
 
 export function useExpensesPage() {
-  // URL state
+  // read URL search params (shareable)
   const [searchParams, setSearchParams] = useSearchParams();
-
-  // initial values from URL (applied filters)
   const initialQ = searchParams.get("q") || "";
   const initialCategoryIds = (searchParams.get("categoryIds") || "")
     .split(",")
@@ -37,55 +42,50 @@ export function useExpensesPage() {
   const initialTo = searchParams.get("to") || "";
   const initialPage = Number(searchParams.get("page") || "1");
 
-  // search
+  // controlled UI state
   const [searchTerm, setSearchTerm] = useState<string>(initialQ);
-
-  // controlled filter inputs (working)
   const [workingCategoryIds, setWorkingCategoryIds] =
     useState<string[]>(initialCategoryIds);
   const [workingFrom, setWorkingFrom] = useState<string>(initialFrom);
   const [workingTo, setWorkingTo] = useState<string>(initialTo);
 
-  // applied filters (used to query)
+  // applied (used for queries)
   const [appliedCategoryIds, setAppliedCategoryIds] =
     useState<string[]>(initialCategoryIds);
   const [appliedFrom, setAppliedFrom] = useState<string | undefined>(
-    initialFrom || undefined
+    initialFrom || undefined,
   );
   const [appliedTo, setAppliedTo] = useState<string | undefined>(
-    initialTo || undefined
+    initialTo || undefined,
   );
 
-  // drawer open (mobile)
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  // pagination
   const [page, setPage] = useState<number>(initialPage || 1);
   const limit = 50;
 
-  // keep searchTerm in sync if URL changed externally
+  // sync searchTerm when URL changes externally
   useEffect(() => {
     setSearchTerm(initialQ);
-     
   }, [initialQ]);
 
-  // Reset page to 1 whenever filters/search change
+  // reset page when filters change
   useEffect(() => {
     setPage(1);
   }, [appliedCategoryIds.join(","), appliedFrom, appliedTo, searchTerm]);
 
-  // Debounce helper (simple internal)
+  // simple debounce for searchTerm
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
   useEffect(() => {
     const id = setTimeout(() => setDebouncedSearch(searchTerm), 300);
     return () => clearTimeout(id);
   }, [searchTerm]);
 
-  // validation
+  // validate date range
   const dateRangeInvalid =
     Boolean(workingFrom && workingTo) && workingFrom > workingTo;
 
-  // build params for useExpenses
+  // build params for useExpenses query
   const params = useMemo(() => {
     const p: Record<string, any> = {
       q: debouncedSearch || undefined,
@@ -94,9 +94,8 @@ export function useExpensesPage() {
       limit,
       page,
     };
-    if (appliedCategoryIds && appliedCategoryIds.length > 0) {
+    if (appliedCategoryIds && appliedCategoryIds.length > 0)
       p.categoryIds = appliedCategoryIds.join(",");
-    }
     return p;
   }, [debouncedSearch, appliedFrom, appliedTo, appliedCategoryIds, page]);
 
@@ -106,7 +105,7 @@ export function useExpensesPage() {
   const deleteMutation = useDeleteExpense();
   const exportMutation = useExportExpenses();
 
-  // derived
+  // derive values for view
   const categories = categoriesQuery.data ?? [];
   const data = expensesQuery.data;
   const isLoading = expensesQuery.isLoading;
@@ -117,7 +116,7 @@ export function useExpensesPage() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
-  // push applied filters + q + page into URL (shareable)
+  // push filters into URL whenever applied filters change
   useEffect(() => {
     const qs = new URLSearchParams();
     if (debouncedSearch) qs.set("q", debouncedSearch);
@@ -127,17 +126,14 @@ export function useExpensesPage() {
     if (appliedTo) qs.set("to", appliedTo);
     if (page && page > 1) qs.set("page", String(page));
     setSearchParams(qs, { replace: true });
-     
   }, [debouncedSearch, appliedCategoryIds, appliedFrom, appliedTo, page]);
 
-  // helpers
   const toggleCategory = useCallback((id: string) => {
     setWorkingCategoryIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
   }, []);
 
-  // Apply handler with strict validation (both or none)
   const handleApply = useCallback(() => {
     const fromSet = Boolean(workingFrom && workingFrom.trim());
     const toSet = Boolean(workingTo && workingTo.trim());
@@ -153,7 +149,6 @@ export function useExpensesPage() {
     setAppliedFrom(workingFrom || undefined);
     setAppliedTo(workingTo || undefined);
     setDrawerOpen(false);
-    // let mutation hooks show toasts; show a UI toast here to confirm filter applied is okay.
     t.success("Filters applied");
   }, [workingCategoryIds, workingFrom, workingTo]);
 
@@ -168,19 +163,15 @@ export function useExpensesPage() {
     t.success("Filters cleared");
   }, []);
 
-  // delete flow (mutations handle toasts)
   const requestDelete = useCallback((id: string) => {
     setDeleteTargetId(id);
     setDeleteModalOpen(true);
   }, []);
-
   const performDelete = useCallback(async () => {
     if (!deleteTargetId) return;
     try {
       await deleteMutation.mutateAsync(deleteTargetId);
-      // hook already shows success toast
     } catch (err) {
-      // hook will show onError toast; keep logging for dev
       console.error("delete failed", err);
     } finally {
       setDeleteModalOpen(false);
@@ -188,7 +179,7 @@ export function useExpensesPage() {
     }
   }, [deleteTargetId, deleteMutation]);
 
-  // export CSV wiring: uses exportMutation (assumed to have toasts). We handle blob download here.
+  // Export CSV helpers - fallback range is last 90 days
   function defaultRange() {
     const today = new Date();
     const to = format(today, "yyyy-MM-dd");
@@ -196,7 +187,6 @@ export function useExpensesPage() {
     const from = format(fromDate, "yyyy-MM-dd");
     return { from, to };
   }
-
   function fallbackFileName(fromStr: string, toStr: string) {
     return `expenses_${fromStr}_${toStr}.csv`;
   }
@@ -208,11 +198,8 @@ export function useExpensesPage() {
 
     try {
       const resp = await exportMutation.mutateAsync({ from, to });
-      // delegate to shared helper for converting resp -> file
       await downloadResponseAsFile(resp as any, fallbackFileName(from, to));
-      // do NOT call t.success here — export hook already shows a toast on success
     } catch (err) {
-      // export hook should show onError; keep console for debugging
       console.error("Export failed", err);
     }
   }, [appliedFrom, appliedTo, exportMutation]);
@@ -227,15 +214,11 @@ export function useExpensesPage() {
   const hasNext = endIndex < total;
 
   return {
-    // reactive state + setters used by view
-    // queries
     data,
     categories,
     isLoading,
     isFetching,
     isError,
-
-    // search / filters
     searchTerm,
     setSearchTerm,
     workingCategoryIds,
@@ -247,13 +230,9 @@ export function useExpensesPage() {
     appliedCategoryIds,
     appliedFrom,
     appliedTo,
-
-    // UI state
     drawerOpen,
     setDrawerOpen,
     dateRangeInvalid,
-
-    // pagination
     page,
     setPage,
     limit,
@@ -264,27 +243,17 @@ export function useExpensesPage() {
     endIndex,
     hasPrev,
     hasNext,
-
-    // delete
     deleteModalOpen,
     setDeleteModalOpen,
     requestDelete,
     performDelete,
     deleteTargetId,
-
-    // helpers
     toggleCategory,
     handleApply,
     handleClear,
-
-    // export
     handleExport,
     isExporting: exportMutation.status === "pending",
-
-    // mutations status
     isDeleting: deleteMutation.status === "pending",
-
-    // categories query state
     categoriesLoading: categoriesQuery.isLoading,
     categoriesError: categoriesQuery.isError,
     refetchCategories: categoriesQuery.refetch,

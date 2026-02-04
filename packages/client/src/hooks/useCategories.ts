@@ -6,6 +6,12 @@ import * as categoryService from "@/services";
 import { queryKeys } from "@/lib";
 import { Category } from "@/types/categories";
 
+/**
+ * useCategories(includeGlobal = true)
+ * - fetches categories (global + user)
+ * - cached for 5 minutes by default
+ */
+
 export const useCategories = (includeGlobal = true) =>
   useQuery<Category[]>({
     queryKey: [queryKeys.categories, { includeGlobal }],

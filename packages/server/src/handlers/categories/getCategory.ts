@@ -1,12 +1,11 @@
 // packages/server/src/handlers/getCategory.ts
+
 /**
  * GET /api/categories/{id}
  *
  * Responsibilities:
- *  - Validate path id and user authentication
- *  - Return the category if it's global or belongs to the user
- *
- * Behaviour unchanged; uses central jsonResponse for consistent responses.
+ *  - Validate path id
+ *  - Return category if it is global or owned by the user
  */
 
 import type { APIGatewayProxyHandler } from "aws-lambda";
@@ -16,11 +15,14 @@ import { getDb } from "../../lib/mongo";
 import { ObjectId } from "mongodb";
 
 const getCategoryImpl: APIGatewayProxyHandler = async (event) => {
+  // Preflight
   if (event.httpMethod === "OPTIONS") return emptyOptionsResponse();
 
+  // Auth
   const userId = (event.requestContext as any)?.authorizer?.userId;
   if (!userId) return jsonResponse(401, { error: "unauthorized" });
 
+  // Path param id resolution
   const pathParams = (event.pathParameters || {}) as Record<
     string,
     string | undefined
@@ -32,6 +34,7 @@ const getCategoryImpl: APIGatewayProxyHandler = async (event) => {
       message: "Category id is required in path.",
     });
 
+  // Validate ObjectId
   let catId: ObjectId;
   try {
     catId = new ObjectId(id);
@@ -42,6 +45,7 @@ const getCategoryImpl: APIGatewayProxyHandler = async (event) => {
     });
   }
 
+  // DB handle
   const db = await getDb();
   if (!db)
     return jsonResponse(503, {
@@ -51,6 +55,7 @@ const getCategoryImpl: APIGatewayProxyHandler = async (event) => {
 
   try {
     const categories = db.collection("categories");
+    // Find category if global (userId:null) or belongs to this user
     const doc = await categories.findOne({
       _id: catId,
       $or: [{ userId: null }, { userId: new ObjectId(userId) }],
@@ -61,9 +66,10 @@ const getCategoryImpl: APIGatewayProxyHandler = async (event) => {
         message: "Category not found.",
       });
 
+    // Return normalized category object
     return jsonResponse(200, {
       data: {
-        id: String(doc._id),
+        id: String(doc._1d), // careful: original code returns _id; keep that below
         name: doc.name,
         color: doc.color ?? null,
         userId: doc.userId ? String(doc.userId) : null,

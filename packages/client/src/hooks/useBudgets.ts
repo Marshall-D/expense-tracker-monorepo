@@ -1,4 +1,5 @@
 // packages/client/src/hooks/useBudgets.ts
+
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import * as budgetService from "@/services";
@@ -6,8 +7,9 @@ import { queryKeys } from "@/lib";
 import type { Budget, BudgetCreatePayload, BudgetUpdatePayload } from "@/types";
 
 /**
- * useBudgets - fetch list of budgets
- * params: { periodStart?: string, categoryId?: string }
+ * useBudgets(params)
+ * - fetches an array of budgets (optionally filtered)
+ * - params: { periodStart?: string, categoryId?: string }
  */
 export const useBudgets = (params?: Record<string, any>) =>
   useQuery<Budget[]>({
@@ -17,7 +19,9 @@ export const useBudgets = (params?: Record<string, any>) =>
   });
 
 /**
- * useBudget - fetch single budget by id
+ * useBudget(id)
+ * - fetch a single budget by id
+ * - enabled only when id is present
  */
 export const useBudget = (id?: string) =>
   useQuery<Budget>({
@@ -32,42 +36,41 @@ export const useBudget = (id?: string) =>
   });
 
 /**
- * useCreateBudget - create budget with optimistic update
+ * useCreateBudget - creates a budget with optimistic update
+ * - onMutate: injects a temporary optimistic item into the budgets cache
+ * - onError: rollback if provided
+ * - onSettled: invalidate relevant queries
  */
 type CreateContext = { previous?: Budget[] | undefined; optimisticId?: string };
 
 export const useCreateBudget = () => {
   const qc = useQueryClient();
 
-  return useMutation<
-    any, // result (server returns { id })
-    Error,
-    BudgetCreatePayload,
-    CreateContext
-  >({
+  return useMutation<any, Error, BudgetCreatePayload, CreateContext>({
     mutationFn: (payload) => budgetService.createBudget(payload),
 
     onMutate: async (payload) => {
+      // cancel ongoing budgets queries
       await qc.cancelQueries({ queryKey: [queryKeys.budgets] });
 
+      // snapshot previous budgets for rollback
       const previous = qc.getQueryData<Budget[] | undefined>([
         queryKeys.budgets,
       ]);
 
-      // optimistic item (minimal)
+      // build optimistic item (minimal fields)
       const optimisticItem: Budget = {
         id: `tmp-${Date.now()}`,
         categoryId: payload.categoryId ?? null,
         amount: payload.amount,
-        // server provides category name; optimistic shows provided name if any
-        // We'll store category in a cast-any spot (actual Budget type has no category? if exists server returns it)
         ...(payload.category ? { category: payload.category } : {}),
       } as any;
 
+      // set optimistic cache
       if (previous) {
         qc.setQueryData<Budget[]>(
           [queryKeys.budgets],
-          [optimisticItem, ...previous]
+          [optimisticItem, ...previous],
         );
       } else {
         qc.setQueryData<Budget[]>([queryKeys.budgets], [optimisticItem]);
@@ -77,12 +80,14 @@ export const useCreateBudget = () => {
     },
 
     onError: (err, variables, context) => {
+      // restore previous on error
       if (context?.previous) {
         qc.setQueryData([queryKeys.budgets], context.previous);
       }
     },
 
     onSettled: () => {
+      // refresh data (server is source of truth)
       qc.invalidateQueries({ queryKey: [queryKeys.budgets] });
       qc.invalidateQueries({ queryKey: [queryKeys.reports] });
       qc.invalidateQueries({ queryKey: [queryKeys.expenses] });
@@ -91,10 +96,10 @@ export const useCreateBudget = () => {
 };
 
 /**
- * useUpdateBudget - updates a budget with optimistic update
- * variables: { id, payload }
+ * useUpdateBudget - optimistic update for a single budget
+ * - updates both list and single-budget caches
  */
-type UpdateVars = { id: string; payload: BudgetUpdatePayload };
+type UpdateVars = { id: string; payload: any };
 type UpdateContext = {
   previous?: Budget[] | undefined;
   previousItem?: Budget | undefined;
@@ -112,7 +117,6 @@ export const useUpdateBudget = () => {
       const previous = qc.getQueryData<Budget[] | undefined>([
         queryKeys.budgets,
       ]);
-
       const previousItem = previous?.find((b) => b.id === id);
 
       if (previous) {
@@ -125,10 +129,9 @@ export const useUpdateBudget = () => {
                   payload.categoryId !== undefined
                     ? payload.categoryId
                     : b.categoryId,
-                // category name may be updated server-side; optimistic keep existing or provided category name
                 ...(payload.category ? { category: payload.category } : {}),
               }
-            : b
+            : b,
         );
         qc.setQueryData<Budget[]>([queryKeys.budgets], newData);
       }
@@ -170,7 +173,7 @@ export const useUpdateBudget = () => {
 };
 
 /**
- * useDeleteBudget - optimistic removal
+ * useDeleteBudget - optimistic deletion
  */
 export const useDeleteBudget = () => {
   const qc = useQueryClient();
@@ -180,28 +183,21 @@ export const useDeleteBudget = () => {
 
     onMutate: async (id) => {
       await qc.cancelQueries({ queryKey: [queryKeys.budgets] });
-
       const previous = qc.getQueryData<Budget[] | undefined>([
         queryKeys.budgets,
       ]);
-
-      if (previous) {
+      if (previous)
         qc.setQueryData<Budget[]>(
           [queryKeys.budgets],
-          previous.filter((b) => b.id !== id)
+          previous.filter((b) => b.id !== id),
         );
-      }
-
-      // remove single budget cache too
       qc.removeQueries({ queryKey: [queryKeys.budget, id] });
-
       return { previous };
     },
 
     onError: (err, id, context) => {
-      if (context?.previous) {
+      if (context?.previous)
         qc.setQueryData([queryKeys.budgets], context.previous);
-      }
     },
 
     onSettled: () => {

@@ -1,21 +1,22 @@
 // packages/client/src/lib/authValidator.ts
+
 /**
- * Small auth validators used across login/register flows.
- *
- * Rules:
- *  - email: simple (non-empty + contains @ + dot) — sufficient for client-side validation
- *  - password: required, min length 8
- *  - name: required, min length 2
- *
+ * Small client-side validators used in forms (login/register)
+ * Return a stable shape so UI can display messages.
  */
 
 export type ValidationResult = { ok: true } | { ok: false; error: string };
 
+/**
+ * validateEmail:
+ * - basic client-side email check: non-empty + simple regex
+ * - sufficient for UX validation; server still validates fully
+ */
 export function validateEmail(email?: string): ValidationResult {
   if (!email || typeof email !== "string" || email.trim() === "") {
     return { ok: false, error: "Email is required." };
   }
-  // conservative but practical regex for client-side check
+  // conservative regex for typical addresses
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!re.test(email.trim())) {
     return { ok: false, error: "Enter a valid email address." };
@@ -23,11 +24,14 @@ export function validateEmail(email?: string): ValidationResult {
   return { ok: true };
 }
 
+/**
+ * validatePassword:
+ * - require at least 8 characters (client-side rule)
+ */
 export function validatePassword(password?: string): ValidationResult {
   if (!password || typeof password !== "string" || password.length === 0) {
     return { ok: false, error: "Password is required." };
   }
-  // minimal rule: at least 8 characters
   if (password.length < 8) {
     return {
       ok: false,
@@ -37,6 +41,10 @@ export function validatePassword(password?: string): ValidationResult {
   return { ok: true };
 }
 
+/**
+ * validateName:
+ * - minimal name check: required and at least 2 characters
+ */
 export function validateName(name?: string): ValidationResult {
   if (!name || typeof name !== "string" || name.trim() === "") {
     return { ok: false, error: "Full name is required." };

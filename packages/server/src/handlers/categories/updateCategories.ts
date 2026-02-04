@@ -3,13 +3,9 @@
  * PUT /api/categories/{id}
  *
  * Responsibilities:
- *  - Validate path id and ensure authenticated user
- *  - Validate request body (updateCategorySchema)
- *  - Prevent name collisions (case-insensitive) with global or user's own categories
- *  - Only allow updating categories owned by the user (global categories are immutable)
- *
- * Behaviour preserved from original implementation. Uses centralized jsonResponse
- * and emptyOptionsResponse for consistent CORS + response shape.
+ *  - Validate path id and request body
+ *  - Ensure update is applied only to user-owned categories
+ *  - Prevent name collisions (case-insensitive) with global or user's categories
  */
 
 import type { APIGatewayProxyHandler } from "aws-lambda";
@@ -21,11 +17,14 @@ import { getDb } from "../../lib/mongo";
 import { ObjectId } from "mongodb";
 
 const updateCategoriesImpl: APIGatewayProxyHandler = async (event) => {
+  // Preflight
   if (event.httpMethod === "OPTIONS") return emptyOptionsResponse();
 
+  // Auth
   const userId = (event.requestContext as any)?.authorizer?.userId;
   if (!userId) return jsonResponse(401, { error: "unauthorized" });
 
+  // Path param id resolution
   const pathParams = (event.pathParameters || {}) as Record<
     string,
     string | undefined
@@ -37,6 +36,7 @@ const updateCategoriesImpl: APIGatewayProxyHandler = async (event) => {
       message: "Category id is required in path.",
     });
 
+  // Validate ObjectId
   let catId: ObjectId;
   try {
     catId = new ObjectId(id);
@@ -47,9 +47,9 @@ const updateCategoriesImpl: APIGatewayProxyHandler = async (event) => {
     });
   }
 
+  // Parse and validate request body
   const parsed = parseAndValidate(updateCategorySchema, event);
   if (!parsed.ok) return parsed.response;
-
   const updates = parsed.data as any;
   if (!updates || Object.keys(updates).length === 0)
     return jsonResponse(400, {
@@ -57,6 +57,7 @@ const updateCategoriesImpl: APIGatewayProxyHandler = async (event) => {
       message: "Provide at least one field to update.",
     });
 
+  // DB handle
   const db = await getDb();
   if (!db)
     return jsonResponse(503, {
@@ -67,33 +68,35 @@ const updateCategoriesImpl: APIGatewayProxyHandler = async (event) => {
   try {
     const categories = db.collection("categories");
 
-    // If updating name, normalize and ensure it doesn't collide (case-insensitive)
+    // If updating name, check for collisions (case-insensitive) excluding this category
     if (typeof updates.name !== "undefined") {
       const newName = String(updates.name).trim();
-      // Check for existing category with same name (case-insensitive) that is NOT this category
+
       const clash = await categories.findOne(
         {
           name: newName,
-          _id: { $ne: catId },
+          _id: { $ne: catId }, // exclude current category
           $or: [{ userId: null }, { userId: new ObjectId(userId) }],
         },
-        { collation: { locale: "en", strength: 2 } }
+        { collation: { locale: "en", strength: 2 } }, // case-insensitive
       );
+
       if (clash) {
         return jsonResponse(409, {
           error: "category_exists",
           message: "Category with that name already exists (global or yours).",
         });
       }
-      // normalize input in-place (safe because updates is a new object from parse)
+
+      // Normalize the provided name in the update object
       updates.name = newName;
     }
 
-    // Only allow updating user-owned categories (global categories cannot be updated).
+    // Only allow updates to user-owned categories. Global categories are immutable here.
     const result = await categories.findOneAndUpdate(
       { _id: catId, userId: new ObjectId(userId) },
       { $set: { ...updates, updatedAt: new Date() } },
-      { returnDocument: "after" }
+      { returnDocument: "after" },
     );
 
     if (!result.value) {

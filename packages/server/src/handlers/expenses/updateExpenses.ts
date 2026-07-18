@@ -1,4 +1,4 @@
-// packages/server/src/handlers/updateExpenses.ts
+// packages/server/src/handlers/expenses/updateExpenses.ts
 
 /**
  * PUT /api/expenses/{id}
@@ -9,71 +9,75 @@
  * - Performs findOneAndUpdate and returns updated document
  */
 
-import type { APIGatewayProxyHandler } from "aws-lambda";
-import { requireAuth } from "../../lib/requireAuth";
+import type { Request, Response } from "express";
 import { parseAndValidate } from "../../lib/validation";
-import { jsonResponse, emptyOptionsResponse } from "../../lib/response";
+import { jsonResponse, send } from "../../lib/response";
 import { getDb } from "../../lib/mongo";
 import { ObjectId } from "mongodb";
 import { updateExpenseSchema } from "../../lib/validators";
+import { getPathId } from "../../lib/params";
 
-const updateExpensesImpl: APIGatewayProxyHandler = async (event) => {
-  // 1) Preflight
-  if (event.httpMethod === "OPTIONS") return emptyOptionsResponse();
+export async function updateExpense(req: Request, res: Response) {
+  // 1) Auth
+  const userId = req.user!.userId;
 
-  // 2) Auth
-  const userId = (event.requestContext as any)?.authorizer?.userId;
-  if (!userId) return jsonResponse(401, { error: "unauthorized" });
-
-  // 3) Path param id resolution
-  const pathParams = (event.pathParameters || {}) as Record<
-    string,
-    string | undefined
-  >;
-  const id = pathParams.id || pathParams.ID || pathParams._id;
+  // 2) Path param id resolution
+  const id = getPathId(req.params);
   if (!id)
-    return jsonResponse(400, {
-      error: "missing_id",
-      message: "Expense id is required in path.",
-    });
+    return send(
+      res,
+      jsonResponse(400, {
+        error: "missing_id",
+        message: "Expense id is required in path.",
+      }),
+    );
 
-  // 4) Validate ObjectId
+  // 3) Validate ObjectId
   let expenseObjectId: ObjectId;
   try {
     expenseObjectId = new ObjectId(id);
   } catch {
-    return jsonResponse(400, {
-      error: "invalid_id",
-      message: "Expense id is not a valid ObjectId.",
-    });
+    return send(
+      res,
+      jsonResponse(400, {
+        error: "invalid_id",
+        message: "Expense id is not a valid ObjectId.",
+      }),
+    );
   }
 
-  // 5) Validate request body using parseAndValidate + schema
-  const parsed = parseAndValidate(updateExpenseSchema, event);
-  if (!parsed.ok) return parsed.response;
+  // 4) Validate request body using parseAndValidate + schema
+  const parsed = parseAndValidate(updateExpenseSchema, req.body);
+  if (!parsed.ok) return send(res, parsed.response);
   const updates = parsed.data as any;
 
-  // 6) Ensure at least one field provided
+  // 5) Ensure at least one field provided
   if (!updates || Object.keys(updates).length === 0) {
-    return jsonResponse(400, {
-      error: "no_updates",
-      message: "Provide at least one updatable field.",
-    });
+    return send(
+      res,
+      jsonResponse(400, {
+        error: "no_updates",
+        message: "Provide at least one updatable field.",
+      }),
+    );
   }
 
-  // 7) DB handle
+  // 6) DB handle
   const db = await getDb();
   if (!db)
-    return jsonResponse(503, {
-      error: "database_unavailable",
-      message: "No database configured.",
-    });
+    return send(
+      res,
+      jsonResponse(503, {
+        error: "database_unavailable",
+        message: "No database configured.",
+      }),
+    );
 
   try {
     const expenses = db.collection("expenses");
     const categoriesColl = db.collection("categories");
 
-    // 8) Build immutable setPayload object for $set
+    // 7) Build immutable setPayload object for $set
     const setPayload: any = {};
 
     if (typeof updates.amount !== "undefined")
@@ -85,7 +89,7 @@ const updateExpensesImpl: APIGatewayProxyHandler = async (event) => {
     if (typeof updates.date !== "undefined")
       setPayload.date = updates.date ? new Date(updates.date) : null;
 
-    // 9) Handle categoryId explicit update (can be null to clear)
+    // 8) Handle categoryId explicit update (can be null to clear)
     if (typeof updates.categoryId !== "undefined") {
       if (updates.categoryId === null) {
         setPayload.categoryId = null;
@@ -99,22 +103,28 @@ const updateExpensesImpl: APIGatewayProxyHandler = async (event) => {
             $or: [{ userId: new ObjectId(userId) }, { userId: null }],
           });
           if (!cat) {
-            return jsonResponse(400, {
-              error: "invalid_category",
-              message: "Category not found or not accessible.",
-            });
+            return send(
+              res,
+              jsonResponse(400, {
+                error: "invalid_category",
+                message: "Category not found or not accessible.",
+              }),
+            );
           }
           setPayload.categoryId = cid;
           setPayload.category = cat.name;
         } catch {
-          return jsonResponse(400, {
-            error: "invalid_category_id",
-            message: "categoryId is not a valid ObjectId.",
-          });
+          return send(
+            res,
+            jsonResponse(400, {
+              error: "invalid_category_id",
+              message: "categoryId is not a valid ObjectId.",
+            }),
+          );
         }
       }
     } else if (typeof updates.category !== "undefined") {
-      // 10) Category name update: try to resolve user-specific or global
+      // 9) Category name update: try to resolve user-specific or global
       const cat =
         (await categoriesColl.findOne({
           name: updates.category,
@@ -135,25 +145,28 @@ const updateExpensesImpl: APIGatewayProxyHandler = async (event) => {
       }
     }
 
-    // 11) Always set updatedAt timestamp
+    // 10) Always set updatedAt timestamp
     setPayload.updatedAt = new Date();
 
-    // 12) Perform findOneAndUpdate returning the updated document
+    // 11) Perform findOneAndUpdate returning the updated document
     const result = await expenses.findOneAndUpdate(
       { _id: expenseObjectId, userId: new ObjectId(userId) },
       { $set: setPayload },
       { returnDocument: "after" },
     );
 
-    // 13) If no value, expense not found -> 404
+    // 12) If no value, expense not found -> 404
     if (!result.value) {
-      return jsonResponse(404, {
-        error: "not_found",
-        message: "Expense not found.",
-      });
+      return send(
+        res,
+        jsonResponse(404, {
+          error: "not_found",
+          message: "Expense not found.",
+        }),
+      );
     }
 
-    // 14) Normalize updated document into response payload
+    // 13) Normalize updated document into response payload
     const updated = result.value;
     const responseBody = {
       id: String(updated._id),
@@ -172,15 +185,16 @@ const updateExpensesImpl: APIGatewayProxyHandler = async (event) => {
         : null,
     };
 
-    // 15) Return updated resource
-    return jsonResponse(200, { data: responseBody });
+    // 14) Return updated resource
+    return send(res, jsonResponse(200, { data: responseBody }));
   } catch (err) {
     console.error("updateExpenses error:", err);
-    return jsonResponse(500, {
-      error: "server_error",
-      message: "Internal server error",
-    });
+    return send(
+      res,
+      jsonResponse(500, {
+        error: "server_error",
+        message: "Internal server error",
+      }),
+    );
   }
-};
-
-export const handler = requireAuth(updateExpensesImpl);
+}

@@ -1,4 +1,4 @@
-// packages/server/src/handlers/getAllCategories.ts
+// packages/server/src/handlers/categories/getAllCategories.ts
 
 /**
  * GET /api/categories
@@ -8,27 +8,29 @@
  *  - Sort user-owned categories first, then by name (ascending)
  */
 
-import type { APIGatewayProxyHandler } from "aws-lambda";
-import { requireAuth } from "../../lib/requireAuth";
-import { jsonResponse, emptyOptionsResponse } from "../../lib/response";
+import type { Request, Response } from "express";
+import { jsonResponse, send } from "../../lib/response";
 import { getDb } from "../../lib/mongo";
 import { ObjectId } from "mongodb";
 
-const getAllCategoriesImpl: APIGatewayProxyHandler = async (event) => {
-  // Preflight
-  if (event.httpMethod === "OPTIONS") return emptyOptionsResponse();
-
-  // Auth
-  const userId = (event.requestContext as any)?.authorizer?.userId;
-  if (!userId) return jsonResponse(401, { error: "unauthorized" });
+export const getAllCategories = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const userId = req.user!.userId;
 
   // DB handle
   const db = await getDb();
-  if (!db)
-    return jsonResponse(503, {
-      error: "database_unavailable",
-      message: "No database configured.",
-    });
+  if (!db) {
+    send(
+      res,
+      jsonResponse(503, {
+        error: "database_unavailable",
+        message: "No database configured.",
+      }),
+    );
+    return;
+  }
 
   try {
     const categories = db.collection("categories");
@@ -48,14 +50,15 @@ const getAllCategoriesImpl: APIGatewayProxyHandler = async (event) => {
       userId: d.userId ? String(d.userId) : null,
       type: d.userId ? "Custom" : "Global",
     }));
-    return jsonResponse(200, { data: items });
+    send(res, jsonResponse(200, { data: items }));
   } catch (err) {
     console.error("getAllCategories error:", err);
-    return jsonResponse(500, {
-      error: "server_error",
-      message: "Internal server error",
-    });
+    send(
+      res,
+      jsonResponse(500, {
+        error: "server_error",
+        message: "Internal server error",
+      }),
+    );
   }
 };
-
-export const handler = requireAuth(getAllCategoriesImpl);

@@ -11,9 +11,8 @@
  * Behavior and CSV formatting preserved from original implementation.
  */
 
-import type { APIGatewayProxyHandler } from "aws-lambda";
-import { requireAuth } from "../../lib/requireAuth";
-import { jsonResponse, emptyOptionsResponse } from "../../lib/response";
+import type { Request, Response } from "express";
+import { jsonResponse, send } from "../../lib/response";
 import { getDb } from "../../lib/mongo";
 import { z } from "zod";
 import { ObjectId } from "mongodb";
@@ -76,26 +75,24 @@ function formatAmount(n: any) {
 }
 
 /* Core implementation of the export handler */
-const expensesExportImpl: APIGatewayProxyHandler = async (event) => {
-  // Handle preflight immediately
-  if (event.httpMethod === "OPTIONS") return emptyOptionsResponse();
-
-  // Ensure user identity is present (requireAuth wrapper will ensure this)
-  const userId = (event.requestContext as any)?.authorizer?.userId;
-  if (!userId) return jsonResponse(401, { error: "unauthorized" });
+export const expensesExport = async (req: Request, res: Response) => {
+  const userId = req.user!.userId;
 
   // Validate query params
-  const parsed = parseQuery(querySchema, event);
-  if (!parsed.ok) return parsed.response;
+  const parsed = parseQuery(querySchema, req.query);
+  if (!parsed.ok) return send(res, parsed.response);
 
   const { from, to, format } = parsed.data;
 
   // Only CSV supported for now
   if (format !== "csv") {
-    return jsonResponse(400, {
-      error: "unsupported_format",
-      message: "Only CSV supported for now.",
-    });
+    return send(
+      res,
+      jsonResponse(400, {
+        error: "unsupported_format",
+        message: "Only CSV supported for now.",
+      }),
+    );
   }
 
   // Compute inclusive date range (adjust to end-of-day if `to` is midnight)
@@ -107,11 +104,14 @@ const expensesExportImpl: APIGatewayProxyHandler = async (event) => {
   // Acquire DB handle
   const db = await getDb();
   if (!db)
-    return jsonResponse(503, {
-      error: "database_unavailable",
-      message:
-        "No database configured. For local dev copy .env.example -> .env and set MONGO_URI; for production set the secret in SSM/Secrets Manager.",
-    });
+    return send(
+      res,
+      jsonResponse(503, {
+        error: "database_unavailable",
+        message:
+          "No database configured. For local dev copy .env.example -> .env and set MONGO_URI; for production set the secret in SSM/Secrets Manager.",
+      }),
+    );
 
   try {
     // Query for matching expenses (descending by date), limit to MAX_ROWS + 1 to detect overflow
@@ -125,10 +125,13 @@ const expensesExportImpl: APIGatewayProxyHandler = async (event) => {
 
     // If more rows than allowed, return 413 asking for alternate export
     if (docs.length > MAX_ROWS) {
-      return jsonResponse(413, {
-        error: "too_large",
-        message: `Export too large for inline CSV; request a signed S3 export (implement later). Rows > ${MAX_ROWS}`,
-      });
+      return send(
+        res,
+        jsonResponse(413, {
+          error: "too_large",
+          message: `Export too large for inline CSV; request a signed S3 export (implement later). Rows > ${MAX_ROWS}`,
+        }),
+      );
     }
 
     // Build CSV rows: header, spacer line, then data rows (with spacer between each)
@@ -156,25 +159,24 @@ const expensesExportImpl: APIGatewayProxyHandler = async (event) => {
     const fileName = `expenses_${from}_to_${to}.csv`;
 
     // Return CSV as text/csv with Content-Disposition for attachment download
-    return {
-      statusCode: 200,
+    return send(res, {
+      status: 200,
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": `attachment; filename="${fileName}"`,
-        "Access-Control-Allow-Origin": "*",
         "Access-Control-Expose-Headers": "Content-Disposition",
       },
       body: csvContent,
-    };
+    });
   } catch (err) {
     // Log and return 500 on unexpected failures
     console.error("expenses.export error:", err);
-    return jsonResponse(500, {
-      error: "server_error",
-      message: "Internal server error",
-    });
+    return send(
+      res,
+      jsonResponse(500, {
+        error: "server_error",
+        message: "Internal server error",
+      }),
+    );
   }
 };
-
-// Wrap and export handler with authentication enforcement
-export const handler = requireAuth(expensesExportImpl);

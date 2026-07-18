@@ -10,6 +10,8 @@ const __dirname = fileURLToPath(new URL(".", import.meta.url));
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
+    // Prevent duplicate React copies in the monorepo (invalid hook call).
+    dedupe: ["react", "react-dom"],
     alias: {
       // "@/..." -> packages/client/src/...
       "@": path.resolve(__dirname, "src"),

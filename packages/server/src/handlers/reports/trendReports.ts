@@ -1,4 +1,4 @@
-// packages/server/src/handlers/trendReports.ts
+// packages/server/src/handlers/reports/trendReports.ts
 
 /**
  * Trends report handler — returns totals per month for the requested recent months.
@@ -10,9 +10,8 @@
  *  - Return an ordered array of month objects with totals for USD and NGN
  */
 
-import type { APIGatewayProxyHandler } from "aws-lambda";
-import { requireAuth } from "../../lib/requireAuth";
-import { jsonResponse, emptyOptionsResponse } from "../../lib/response";
+import type { Request, Response } from "express";
+import { jsonResponse, send } from "../../lib/response";
 import { getDb } from "../../lib/mongo";
 import { z } from "zod";
 import { ObjectId } from "mongodb";
@@ -27,17 +26,12 @@ const querySchema = z.object({
 });
 
 /* Core implementation */
-const reportsTrendsImpl: APIGatewayProxyHandler = async (event) => {
-  // Preflight handling
-  if (event.httpMethod === "OPTIONS") return emptyOptionsResponse();
-
-  // Auth guaranteed by requireAuth, but we still read the userId and return 401 if missing.
-  const userId = (event.requestContext as any)?.authorizer?.userId;
-  if (!userId) return jsonResponse(401, { error: "unauthorized" });
+export const reportsTrends = async (req: Request, res: Response) => {
+  const userId = req.user!.userId;
 
   // Parse and validate query parameters
-  const parsedQs = parseQuery(querySchema, event);
-  if (!parsedQs.ok) return parsedQs.response;
+  const parsedQs = parseQuery(querySchema, req.query);
+  if (!parsedQs.ok) return send(res, parsedQs.response);
 
   // Convert months to a bounded integer: minimum 1, maximum 24
   const monthsRaw = parsedQs.data.months;
@@ -53,11 +47,14 @@ const reportsTrendsImpl: APIGatewayProxyHandler = async (event) => {
   // Acquire DB
   const db = await getDb();
   if (!db)
-    return jsonResponse(503, {
-      error: "database_unavailable",
-      message:
-        "No database configured. For local dev copy .env.example -> .env and set MONGO_URI; for production set the secret in SSM/Secrets Manager.",
-    });
+    return send(
+      res,
+      jsonResponse(503, {
+        error: "database_unavailable",
+        message:
+          "No database configured. For local dev copy .env.example -> .env and set MONGO_URI; for production set the secret in SSM/Secrets Manager.",
+      }),
+    );
 
   try {
     const expenses = db.collection("expenses");
@@ -118,15 +115,15 @@ const reportsTrendsImpl: APIGatewayProxyHandler = async (event) => {
     }
 
     // Return the ordered months array
-    return jsonResponse(200, { months: out });
+    return send(res, jsonResponse(200, { months: out }));
   } catch (err) {
     console.error("reports.trends error:", err);
-    return jsonResponse(500, {
-      error: "server_error",
-      message: "Internal server error",
-    });
+    return send(
+      res,
+      jsonResponse(500, {
+        error: "server_error",
+        message: "Internal server error",
+      }),
+    );
   }
 };
-
-// Wrap and export
-export const handler = requireAuth(reportsTrendsImpl);

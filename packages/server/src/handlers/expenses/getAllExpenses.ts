@@ -1,4 +1,4 @@
-// packages/server/src/handlers/getAllExpenses.ts
+// packages/server/src/handlers/expenses/getAllExpenses.ts
 
 /**
  * GET /api/expenses
@@ -10,9 +10,8 @@
  * - Apply pagination (limit/page) and return { total, page, limit, data }
  */
 
-import type { APIGatewayProxyHandler } from "aws-lambda";
-import { requireAuth } from "../../lib/requireAuth";
-import { jsonResponse, emptyOptionsResponse } from "../../lib/response";
+import type { Request, Response } from "express";
+import { jsonResponse, send } from "../../lib/response";
 import { getDb } from "../../lib/mongo";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
@@ -76,19 +75,15 @@ function escapeRegex(input: string) {
   return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-const getAllExpensesImpl: APIGatewayProxyHandler = async (event) => {
-  // 1) OPTIONS preflight
-  if (event.httpMethod === "OPTIONS") return emptyOptionsResponse();
+export async function getAllExpenses(req: Request, res: Response) {
+  // 1) Auth
+  const userId = req.user!.userId;
 
-  // 2) Auth
-  const userId = (event.requestContext as any)?.authorizer?.userId;
-  if (!userId) return jsonResponse(401, { error: "unauthorized" });
+  // 2) Validate query params centrally
+  const parsed = parseQuery(getAllExpensesQuerySchema, req.query);
+  if (!parsed.ok) return send(res, parsed.response);
 
-  // 3) Validate query params centrally
-  const parsed = parseQuery(getAllExpensesQuerySchema, event);
-  if (!parsed.ok) return parsed.response;
-
-  // 4) Extract params and set defaults for pagination
+  // 3) Extract params and set defaults for pagination
   const {
     from,
     to,
@@ -104,21 +99,24 @@ const getAllExpensesImpl: APIGatewayProxyHandler = async (event) => {
   const page = typeof maybePage === "number" ? maybePage : 1;
   const skip = (page - 1) * limit;
 
-  // 5) DB handle
+  // 4) DB handle
   const db = await getDb();
   if (!db)
-    return jsonResponse(503, {
-      error: "database_unavailable",
-      message: "No database configured.",
-    });
+    return send(
+      res,
+      jsonResponse(503, {
+        error: "database_unavailable",
+        message: "No database configured.",
+      }),
+    );
 
   try {
     const expenses = db.collection("expenses");
 
-    // 6) Build base filter for this user
+    // 5) Build base filter for this user
     const filter: any = { userId: new ObjectId(userId) };
 
-    // 7) Category precedence:
+    // 6) Category precedence:
     // categoryIds (CSV) > categoryId > category name
     if (categoryIds) {
       const parts = categoryIds.split(",").filter(Boolean);
@@ -129,14 +127,14 @@ const getAllExpensesImpl: APIGatewayProxyHandler = async (event) => {
       filter.category = category;
     }
 
-    // 8) Date range
+    // 7) Date range
     if (from || to) {
       filter.date = {};
       if (from) filter.date.$gte = new Date(from);
       if (to) filter.date.$lte = new Date(to);
     }
 
-    // 9) Text search q: if category-filter present, search description only,
+    // 8) Text search q: if category-filter present, search description only,
     // otherwise search description OR category.
     if (q && q.trim()) {
       const term = q.trim();
@@ -152,10 +150,10 @@ const getAllExpensesImpl: APIGatewayProxyHandler = async (event) => {
       }
     }
 
-    // 10) Count total documents for pagination metadata
+    // 9) Count total documents for pagination metadata
     const total = await expenses.countDocuments(filter);
 
-    // 11) Query with sorting, skip, limit
+    // 10) Query with sorting, skip, limit
     const cursor = expenses
       .find(filter)
       .sort({ date: -1 })
@@ -164,7 +162,7 @@ const getAllExpensesImpl: APIGatewayProxyHandler = async (event) => {
 
     const docs = await cursor.toArray();
 
-    // 12) Normalize output documents into lightweight DTOs
+    // 11) Normalize output documents into lightweight DTOs
     const items = docs.map((d: any) => ({
       id: String(d._id),
       userId: d.userId ? String(d.userId) : null,
@@ -177,20 +175,24 @@ const getAllExpensesImpl: APIGatewayProxyHandler = async (event) => {
       createdAt: d.createdAt ? new Date(d.createdAt).toISOString() : null,
     }));
 
-    // 13) Return paginated response
-    return jsonResponse(200, {
-      total,
-      page,
-      limit,
-      data: items,
-    });
+    // 12) Return paginated response
+    return send(
+      res,
+      jsonResponse(200, {
+        total,
+        page,
+        limit,
+        data: items,
+      }),
+    );
   } catch (err) {
     console.error("getAllExpenses error:", err);
-    return jsonResponse(500, {
-      error: "server_error",
-      message: "Internal server error",
-    });
+    return send(
+      res,
+      jsonResponse(500, {
+        error: "server_error",
+        message: "Internal server error",
+      }),
+    );
   }
-};
-
-export const handler = requireAuth(getAllExpensesImpl);
+}

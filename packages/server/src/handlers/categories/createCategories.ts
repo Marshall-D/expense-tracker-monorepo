@@ -1,4 +1,4 @@
-// packages/server/src/handlers/createCategories.ts
+// packages/server/src/handlers/categories/createCategories.ts
 
 /**
  * POST /api/categories
@@ -9,45 +9,49 @@
  *  - Insert a new user-owned category document and return metadata
  */
 
-import type { APIGatewayProxyHandler } from "aws-lambda";
-import { requireAuth } from "../../lib/requireAuth";
+import type { Request, Response } from "express";
 import { parseAndValidate } from "../../lib/validation";
-import { jsonResponse, emptyOptionsResponse } from "../../lib/response";
+import { jsonResponse, send } from "../../lib/response";
 import { createCategorySchema } from "../../lib/validators";
 import { getDb } from "../../lib/mongo";
 import { ObjectId } from "mongodb";
 
 /**
- * createCategoryImpl
- * - Core implementation of POST /api/categories (not wrapped)
+ * createCategory
+ * - Core implementation of POST /api/categories
  * - Uses parseAndValidate to parse/validate body, then writes to DB
  */
-const createCategoryImpl: APIGatewayProxyHandler = async (event) => {
-  // Short-circuit CORS preflight
-  if (event.httpMethod === "OPTIONS") {
-    return emptyOptionsResponse();
-  }
-
+export const createCategory = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   // Parse and validate JSON body against schema
-  const parsed = parseAndValidate(createCategorySchema, event);
-  if (!parsed.ok) return parsed.response; // early return on invalid payload
+  const parsed = parseAndValidate(createCategorySchema, req.body);
+  if (!parsed.ok) {
+    send(res, parsed.response);
+    return;
+  }
 
   // Normalize name: trim whitespace but keep original casing for display
   const rawName = parsed.data.name as string;
   const name = rawName.trim();
   const color = parsed.data.color as string | undefined;
 
-  // Get authenticated user id from requestContext.authorizer (requireAuth will ensure presence)
-  const userId = (event.requestContext as any)?.authorizer?.userId;
-  if (!userId) return jsonResponse(401, { error: "unauthorized" });
+  // Get authenticated user id (attached by the authenticate middleware)
+  const userId = req.user!.userId;
 
   // Acquire DB connection
   const db = await getDb();
-  if (!db)
-    return jsonResponse(503, {
-      error: "database_unavailable",
-      message: "No database configured.",
-    });
+  if (!db) {
+    send(
+      res,
+      jsonResponse(503, {
+        error: "database_unavailable",
+        message: "No database configured.",
+      }),
+    );
+    return;
+  }
 
   try {
     const categories = db.collection("categories");
@@ -64,10 +68,14 @@ const createCategoryImpl: APIGatewayProxyHandler = async (event) => {
 
     if (existing) {
       // 409 Conflict when name already exists for either global or this user
-      return jsonResponse(409, {
-        error: "category_exists",
-        message: "Category with that name already exists (global or yours).",
-      });
+      send(
+        res,
+        jsonResponse(409, {
+          error: "category_exists",
+          message: "Category with that name already exists (global or yours).",
+        }),
+      );
+      return;
     }
 
     // Prepare doc and insert (user-owned custom category)
@@ -79,26 +87,29 @@ const createCategoryImpl: APIGatewayProxyHandler = async (event) => {
       createdAt: now,
       updatedAt: now,
     };
-    const res = await categories.insertOne(doc);
+    const result = await categories.insertOne(doc);
 
     // Return created metadata (201)
-    return jsonResponse(201, {
-      data: {
-        id: String(res.insertedId),
-        name,
-        color: color ?? null,
-        userId, // keep behaviour: return raw userId string
-        type: "Custom",
-      },
-    });
+    send(
+      res,
+      jsonResponse(201, {
+        data: {
+          id: String(result.insertedId),
+          name,
+          color: color ?? null,
+          userId, // keep behaviour: return raw userId string
+          type: "Custom",
+        },
+      }),
+    );
   } catch (err) {
     console.error("createCategory error:", err);
-    return jsonResponse(500, {
-      error: "server_error",
-      message: "Internal server error",
-    });
+    send(
+      res,
+      jsonResponse(500, {
+        error: "server_error",
+        message: "Internal server error",
+      }),
+    );
   }
 };
-
-// Export wrapped handler (requireAuth enforces JWT and attaches authorizer)
-export const handler = requireAuth(createCategoryImpl);

@@ -1,4 +1,4 @@
-// packages/server/src/handlers/monthlyReports.ts
+// packages/server/src/handlers/reports/monthlyReports.ts
 
 /**
  * Monthly report handler — returns totals and top categories for a given year/month.
@@ -10,9 +10,8 @@
  *  - Return JSON with totals and top categories
  */
 
-import type { APIGatewayProxyHandler } from "aws-lambda";
-import { requireAuth } from "../../lib/requireAuth";
-import { jsonResponse, emptyOptionsResponse } from "../../lib/response";
+import type { Request, Response } from "express";
+import { jsonResponse, send } from "../../lib/response";
 import { getDb } from "../../lib/mongo";
 import { z } from "zod";
 import { ObjectId } from "mongodb";
@@ -31,17 +30,12 @@ const querySchema = z.object({
 });
 
 /* Core implementation */
-const reportsMonthlyImpl: APIGatewayProxyHandler = async (event) => {
-  // Preflight handling
-  if (event.httpMethod === "OPTIONS") return emptyOptionsResponse();
-
-  // Extract userId from requestContext (set by requireAuth wrapper)
-  const userId = (event.requestContext as any)?.authorizer?.userId;
-  if (!userId) return jsonResponse(401, { error: "unauthorized" });
+export const reportsMonthly = async (req: Request, res: Response) => {
+  const userId = req.user!.userId;
 
   // Parse and validate the query parameters
-  const parsed = parseQuery(querySchema, event);
-  if (!parsed.ok) return parsed.response;
+  const parsed = parseQuery(querySchema, req.query);
+  if (!parsed.ok) return send(res, parsed.response);
 
   const { year, month } = parsed.data;
 
@@ -54,11 +48,14 @@ const reportsMonthlyImpl: APIGatewayProxyHandler = async (event) => {
   // Acquire DB
   const db = await getDb();
   if (!db)
-    return jsonResponse(503, {
-      error: "database_unavailable",
-      message:
-        "No database configured. For local dev copy .env.example -> .env and set MONGO_URI; for production set the secret in SSM/Secrets Manager.",
-    });
+    return send(
+      res,
+      jsonResponse(503, {
+        error: "database_unavailable",
+        message:
+          "No database configured. For local dev copy .env.example -> .env and set MONGO_URI; for production set the secret in SSM/Secrets Manager.",
+      }),
+    );
 
   try {
     const expenses = db.collection("expenses");
@@ -114,20 +111,23 @@ const reportsMonthlyImpl: APIGatewayProxyHandler = async (event) => {
       .toArray();
 
     // Return the aggregated results and a canonical period label YYYY-MM
-    return jsonResponse(200, {
-      period: `${year}-${String(month).padStart(2, "0")}`,
-      totals: totalsByCurrency,
-      topCategories,
-    });
+    return send(
+      res,
+      jsonResponse(200, {
+        period: `${year}-${String(month).padStart(2, "0")}`,
+        totals: totalsByCurrency,
+        topCategories,
+      }),
+    );
   } catch (err) {
     // Log and return 500 on unexpected errors
     console.error("reports.monthly error:", err);
-    return jsonResponse(500, {
-      error: "server_error",
-      message: "Internal server error",
-    });
+    return send(
+      res,
+      jsonResponse(500, {
+        error: "server_error",
+        message: "Internal server error",
+      }),
+    );
   }
 };
-
-// Wrap with requireAuth and export
-export const handler = requireAuth(reportsMonthlyImpl);

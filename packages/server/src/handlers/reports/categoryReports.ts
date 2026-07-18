@@ -1,4 +1,4 @@
-// packages/server/src/handlers/categoryReports.ts
+// packages/server/src/handlers/reports/categoryReports.ts
 
 /**
  * Reports by category for a given date range.
@@ -12,9 +12,8 @@
  * each step for easier interview explanation.
  */
 
-import type { APIGatewayProxyHandler } from "aws-lambda";
-import { requireAuth } from "../../lib/requireAuth";
-import { jsonResponse, emptyOptionsResponse } from "../../lib/response";
+import type { Request, Response } from "express";
+import { jsonResponse, send } from "../../lib/response";
 import { getDb } from "../../lib/mongo";
 import { z } from "zod";
 import { ObjectId } from "mongodb";
@@ -32,22 +31,15 @@ const querySchema = z.object({
 });
 
 /**
- * Core implementation of the report handler (not wrapped).
- * The handler follows APIGatewayProxyHandler signature (event, context, callback).
+ * Core implementation of the report handler.
  */
-const reportsByCategoryImpl: APIGatewayProxyHandler = async (event) => {
-  // If this is an OPTIONS preflight request, return an empty 204 response.
-  if (event.httpMethod === "OPTIONS") return emptyOptionsResponse();
-
-  // Extract userId injected by requireAuth (authorizer info).
-  const userId = (event.requestContext as any)?.authorizer?.userId;
-  // If no userId present, return 401 unauthorized.
-  if (!userId) return jsonResponse(401, { error: "unauthorized" });
+export const reportsByCategory = async (req: Request, res: Response) => {
+  const userId = req.user!.userId;
 
   // Validate and parse query parameters using parseQuery helper.
   // parseQuery either returns { ok: true, data } or { ok: false, response }.
-  const parsed = parseQuery(querySchema, event);
-  if (!parsed.ok) return parsed.response;
+  const parsed = parseQuery(querySchema, req.query);
+  if (!parsed.ok) return send(res, parsed.response);
 
   // Convert the parsed ISO date strings to Date objects.
   const from = new Date(parsed.data.from);
@@ -62,11 +54,14 @@ const reportsByCategoryImpl: APIGatewayProxyHandler = async (event) => {
   // Acquire DB handle via helper (may return null if MONGO_URI not configured).
   const db = await getDb();
   if (!db)
-    return jsonResponse(503, {
-      error: "database_unavailable",
-      message:
-        "No database configured. For local dev copy .env.example -> .env and set MONGO_URI; for production set the secret in SSM/Secrets Manager.",
-    });
+    return send(
+      res,
+      jsonResponse(503, {
+        error: "database_unavailable",
+        message:
+          "No database configured. For local dev copy .env.example -> .env and set MONGO_URI; for production set the secret in SSM/Secrets Manager.",
+      }),
+    );
 
   try {
     // Reference the expenses collection
@@ -115,21 +110,23 @@ const reportsByCategoryImpl: APIGatewayProxyHandler = async (event) => {
     const rows = await expenses.aggregate(pipeline).toArray();
 
     // Return a 200 JSON response with the date range and rows by category
-    return jsonResponse(200, {
-      from: parsed.data.from,
-      to: parsed.data.to,
-      byCategory: rows,
-    });
+    return send(
+      res,
+      jsonResponse(200, {
+        from: parsed.data.from,
+        to: parsed.data.to,
+        byCategory: rows,
+      }),
+    );
   } catch (err) {
     // Log the error for debugging and return a 500 server error to the client
     console.error("reports.byCategory error:", err);
-    return jsonResponse(500, {
-      error: "server_error",
-      message: "Internal server error",
-    });
+    return send(
+      res,
+      jsonResponse(500, {
+        error: "server_error",
+        message: "Internal server error",
+      }),
+    );
   }
 };
-
-// Wrap the implementation with requireAuth to enforce JWT authentication.
-// Expose `handler` for Serverless / local-dev to import.
-export const handler = requireAuth(reportsByCategoryImpl);

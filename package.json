@@ -16,14 +16,6 @@
     "lint": "pnpm -w -r run lint",
     "check:env": "node ./scripts/check-env.js",
     "bootstrap": "pnpm install",
-    "deploy:server": "bash packages/server/src/scripts/deploy-live.sh",
     "ci:build": "pnpm install --frozen-lockfile && pnpm run check:env && pnpm run build"
-  },
-  "dependencies": {
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "lucide-react": "^0.562.0",
-    "react-hot-toast": "^2.6.0",
-    "tailwind-merge": "^3.4.0"
   }
 }

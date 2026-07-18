@@ -1,41 +1,48 @@
-// packages/server/src/lib/response.ts
 /**
- * Small HTTP/JSON response helpers and CORS headers.
- * Single responsibility: centralise response formatting and CORS so other files
- * don't duplicate them.
+ * HTTP/JSON response helpers for Express.
+ * Centralises response formatting so route handlers stay consistent.
  */
 
-import type { APIGatewayProxyResult } from "aws-lambda";
+import type { Response } from "express";
 
-export const corsHeaders = {
-  "Content-Type": "application/json",
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+export type HttpResult = {
+  status: number;
+  body?: unknown;
+  headers?: Record<string, string>;
 };
 
 /**
- * Build a standard APIGateway JSON response with CORS headers.
- * Keep this pure and side-effect free.
+ * Build a standard JSON HTTP result.
  */
-export function jsonResponse(
-  statusCode: number,
-  body: unknown
-): APIGatewayProxyResult {
+export function jsonResponse(status: number, body: unknown): HttpResult {
   return {
-    statusCode,
-    headers: corsHeaders,
-    body: JSON.stringify(body),
+    status,
+    body,
+    headers: { "Content-Type": "application/json" },
   };
 }
 
 /**
- * Pre-built response for OPTIONS preflight (no body).
+ * Send an HttpResult through Express.
+ * Supports JSON bodies and raw string bodies (e.g. CSV export).
  */
-export function emptyOptionsResponse(): APIGatewayProxyResult {
-  return {
-    statusCode: 204,
-    headers: corsHeaders,
-    body: "",
-  };
+export function send(res: Response, result: HttpResult): Response {
+  if (result.headers) {
+    res.set(result.headers);
+  }
+
+  if (result.status === 204 || result.body === undefined) {
+    return res.status(result.status).send();
+  }
+
+  const contentType =
+    result.headers?.["Content-Type"] ??
+    result.headers?.["content-type"] ??
+    "application/json";
+
+  if (contentType.includes("application/json")) {
+    return res.status(result.status).json(result.body);
+  }
+
+  return res.status(result.status).send(result.body as string);
 }
